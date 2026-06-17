@@ -8,7 +8,7 @@ from datetime import date, datetime
 
 from modules.analyzer import analyze_match, extract_text_from_image
 from modules.crawler import fetch_images_from_url, fetch_jd_from_url
-from modules.sheets_api import fetch_jobs, save_result, update_applied, delete_job
+# sheets_api: Task 4에서 app.py 전면 재작성 시 연결 예정
 
 st.set_page_config(page_title="JD 매칭 분석기", page_icon="🎯", layout="wide")
 st.title("🎯 이력서 × JD 매칭 분석기")
