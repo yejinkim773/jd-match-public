@@ -47,7 +47,10 @@ def generate_result_image(result: dict) -> bytes:
     draw.text((32, _HEADER_H + 24), title, fill=_TEXT_DARK, font=_font(22))
 
     # 스코어
-    score = int(result.get("score", 0))
+    try:
+        score = max(0, min(100, int(result.get("score", 0))))
+    except (ValueError, TypeError):
+        score = 0
     draw.text((32, _HEADER_H + 72), "매칭 스코어", fill=_TEXT_GRAY, font=_font(14))
     draw.text((32, _HEADER_H + 92), f"{score}점", fill=_TEXT_DARK, font=_font(36))
 

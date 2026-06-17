@@ -33,3 +33,14 @@ def test_image_dimensions():
 def test_handles_missing_fields():
     result = generate_result_image({})
     assert isinstance(result, bytes)
+
+
+def test_handles_invalid_score():
+    result = generate_result_image({"score": "invalid", "company": "테스트"})
+    assert isinstance(result, bytes)
+
+
+def test_clamps_score_over_100():
+    result = generate_result_image({"score": 150, "company": "테스트"})
+    img = Image.open(io.BytesIO(result))
+    assert img.width == 800  # image still renders correctly
