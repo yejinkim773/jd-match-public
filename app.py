@@ -60,8 +60,74 @@ def render_step_indicator(current: int) -> None:
 
 
 # ── 스텝별 렌더 함수 (다음 Task에서 구현) ─────────────────────
+_RESUME_TEMPLATE = """\
+📋 학력
+예) 한국대학교 컴퓨터공학과 졸업 (2024)
+
+💼 경력 (신입이면 생략 가능)
+예) ABC회사 마케팅팀 인턴 (2023.07~12)
+[요약] 신규 유저 온보딩 개선 프로젝트 담당, 전환율 12% 향상 기여
+[상세]
+- 유저 인터뷰 10명 진행 및 페인포인트 분석
+- Notion 기반 온보딩 플로우 재설계 및 A/B 테스트 운영
+- GA4로 퍼널 이탈 구간 파악 후 개선안 도출
+
+🛠 스킬
+예) Python, SQL, Figma, Google Analytics
+
+📁 프로젝트
+예) 사용자 행동 분석 대시보드 구축
+- Looker Studio + BigQuery 활용하여 주간 리포트 자동화
+"""
+
+
 def render_step1() -> None:
-    st.info("Step 1 — 준비 중")
+    st.subheader("이력서를 입력해주세요")
+
+    tab_pdf, tab_text = st.tabs(["📄 PDF 업로드", "✏️ 직접 입력"])
+
+    with tab_pdf:
+        uploaded = st.file_uploader(
+            "PDF 이력서 업로드",
+            type=["pdf"],
+            help="업로드하면 텍스트를 자동으로 추출해드려요",
+        )
+        if uploaded:
+            file_id = f"{uploaded.name}_{uploaded.size}"
+            if st.session_state.get("_last_pdf_id") != file_id:
+                with pdfplumber.open(io.BytesIO(uploaded.read())) as pdf:
+                    extracted = "\n".join(
+                        p.extract_text() or "" for p in pdf.pages
+                    ).strip()
+                if extracted:
+                    st.session_state.resume_text = extracted
+                    st.session_state["_last_pdf_id"] = file_id
+                    st.success("✅ 텍스트 추출 완료! 아래에서 확인하세요.")
+                else:
+                    st.warning("⚠️ 이 PDF에서 텍스트를 읽지 못했어요. '직접 입력' 탭을 이용해주세요.")
+            if st.session_state.resume_text:
+                st.text_area("추출된 이력서 (수정 가능)", value=st.session_state.resume_text,
+                             height=300, key="_pdf_preview")
+
+    with tab_text:
+        edited = st.text_area(
+            "이력서 내용 입력",
+            value=st.session_state.resume_text or _RESUME_TEMPLATE,
+            height=400,
+            placeholder=_RESUME_TEMPLATE,
+            key="_text_resume",
+        )
+        if st.button("✅ 이력서 저장", type="secondary"):
+            st.session_state.resume_text = edited
+            st.success("저장됐어요!")
+
+    st.divider()
+    if st.button("다음 →", type="primary",
+                 disabled=not st.session_state.resume_text.strip()):
+        events.capture("resume_completed",
+                       {"method": "pdf" if st.session_state.get("_last_pdf_id") else "text"})
+        st.session_state.step = 2
+        st.rerun()
 
 
 def render_step2() -> None:
