@@ -247,7 +247,132 @@ def render_step3() -> None:
 
 
 def render_step4() -> None:
-    st.info("Step 4 — 준비 중")
+    result = st.session_state.analysis_result
+    if not result:
+        st.error("분석 결과가 없어요.")
+        if st.button("처음으로"):
+            _reset()
+        return
+
+    score = result.get("score", 0)
+
+    # ── 헤더 ──────────────────────────────────────────────
+    st.markdown(
+        f"**{result.get('company', '미확인')}**  ·  {result.get('position', '미확인')}"
+    )
+
+    # ── 스코어 ────────────────────────────────────────────
+    color = "🟢" if score >= 70 else ("🟡" if score >= 50 else "🔴")
+    col_score, col_bar = st.columns([1, 3])
+    with col_score:
+        st.metric("매칭 스코어", f"{color} {score}점")
+    with col_bar:
+        st.progress(score / 100)
+
+    # ── 필수요건 ──────────────────────────────────────────
+    st.subheader("📋 필수요건")
+    for req in result.get("required_matches", []):
+        status = req.get("status", "unmatched")
+        icon = "✅" if status == "matched" else ("🔍" if status == "partial" else "❌")
+        st.write(f"{icon} **{req.get('requirement', '')}**")
+        if req.get("evidence"):
+            st.caption(f"└ {req.get('evidence')}")
+        if status == "partial" and req.get("tip"):
+            st.info(f"💡 {req.get('tip')}")
+
+    # ── 강점 ──────────────────────────────────────────────
+    if result.get("preferred_matches"):
+        st.subheader("⭐ 강점")
+        for pref in result.get("preferred_matches", []):
+            st.write(f"⭐ **{pref.get('requirement', '')}**")
+            st.caption(f"└ {pref.get('evidence', '')}")
+
+    # ── 총평 ──────────────────────────────────────────────
+    st.subheader("📝 총평")
+    st.info(result.get("summary", ""))
+
+    st.divider()
+
+    # ── 피드백 ────────────────────────────────────────────
+    if not st.session_state.feedback_submitted:
+        st.markdown("##### 💬 이 분석이 도움이 됐나요?")
+        col_yes, col_no = st.columns(2)
+        with col_yes:
+            if st.button("👍 도움됐어요", use_container_width=True):
+                _submit_feedback(helpful=True, reason="", score=score)
+        with col_no:
+            if st.button("👎 아쉬웠어요", use_container_width=True):
+                st.session_state["_show_reason"] = True
+
+        if st.session_state.get("_show_reason"):
+            reason = st.radio(
+                "어떤 점이 아쉬웠나요?",
+                ["결과가 부정확한 것 같아요", "내용이 너무 추상적이에요",
+                 "이력서를 잘 못 읽은 것 같아요", "기타"],
+                key="_feedback_reason",
+            )
+            if st.button("제출", type="primary"):
+                _submit_feedback(helpful=False, reason=reason, score=score)
+    else:
+        st.success("피드백 감사해요! 🙏")
+
+    st.divider()
+
+    # ── 공유 / 재분석 ──────────────────────────────────────
+    col_copy, col_img, col_reset = st.columns(3)
+
+    with col_copy:
+        copy_text = (
+            f"[JD 매칭 분석기]\n"
+            f"{result.get('company', '')} · {result.get('position', '')}\n"
+            f"매칭 스코어: {score}점\n\n"
+            f"{result.get('summary', '')}"
+        )
+        st.download_button(
+            "📋 텍스트 복사",
+            data=copy_text,
+            file_name="jd_match_result.txt",
+            mime="text/plain",
+            use_container_width=True,
+        )
+
+    with col_img:
+        img_bytes = generate_result_image(result)
+        st.download_button(
+            "🖼️ 이미지 저장",
+            data=img_bytes,
+            file_name="jd_match_result.png",
+            mime="image/png",
+            use_container_width=True,
+        )
+
+    with col_reset:
+        if st.button("🔄 다시 분석하기", use_container_width=True):
+            _reset()
+
+
+def _submit_feedback(helpful: bool, reason: str, score: int) -> None:
+    if _FEEDBACK_ENABLED:
+        try:
+            _save_feedback(helpful=helpful, reason=reason, score=score)
+        except Exception:
+            pass
+    events.capture("feedback_submitted", {
+        "helpful": "yes" if helpful else "no",
+        "reason": reason,
+        "score": score,
+    })
+    st.session_state.feedback_submitted = True
+    st.session_state.pop("_show_reason", None)
+    st.rerun()
+
+
+def _reset() -> None:
+    for k in list(st.session_state.keys()):
+        if k not in ("session_id", "app_loaded_captured"):
+            del st.session_state[k]
+    st.session_state.step = 1
+    st.rerun()
 
 
 # ── 라우팅 ────────────────────────────────────────────────────
