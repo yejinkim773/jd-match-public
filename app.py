@@ -224,7 +224,26 @@ def render_step2() -> None:
 
 
 def render_step3() -> None:
-    st.info("Step 3 — 준비 중")
+    st.subheader("분석 중이에요...")
+    st.caption("이력서와 채용공고를 비교하는 중이에요. 10~20초 소요돼요.")
+
+    with st.spinner("🔍 매칭 결과를 분석하는 중..."):
+        try:
+            result = analyze_match(
+                st.session_state.resume_text,
+                st.session_state.jd_text,
+            )
+        except Exception as e:
+            st.error(f"분석 중 오류가 발생했어요: {e}")
+            if st.button("← 돌아가기"):
+                st.session_state.step = 2
+                st.rerun()
+            return
+
+    events.capture("analysis_completed", {"score": result.get("score", 0)})
+    st.session_state.analysis_result = result
+    st.session_state.step = 4
+    st.rerun()
 
 
 def render_step4() -> None:
