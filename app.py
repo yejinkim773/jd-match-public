@@ -6,7 +6,7 @@ import streamlit as st
 
 import modules.events as events
 from modules.analyzer import analyze_match, extract_text_from_image
-from modules.crawler import fetch_jd_from_url, fetch_images_from_url
+from modules.crawler import fetch_jd_from_url
 from modules.result_image import generate_result_image
 
 try:

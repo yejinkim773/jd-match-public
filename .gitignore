@@ -4,3 +4,4 @@ resume.md
 __pycache__/
 *.pyc
 .env
+.superpowers/
