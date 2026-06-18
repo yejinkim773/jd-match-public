@@ -130,8 +130,97 @@ def render_step1() -> None:
         st.rerun()
 
 
+def _detect_jd_method() -> str:
+    if st.session_state.jd_url:
+        return "url"
+    if st.session_state.get("_jd_img"):
+        return "image"
+    return "text"
+
+
 def render_step2() -> None:
-    st.info("Step 2 — 준비 중")
+    st.subheader("채용공고를 입력해주세요")
+
+    # 폴백으로 탭 강제 이동 시 안내 메시지 표시
+    if st.session_state.get("_jd_tab_override") == "image":
+        st.warning("📸 자동으로 읽어오지 못했어요. 공고 스크린샷을 업로드해주세요.")
+    elif st.session_state.get("_jd_tab_override") == "text":
+        st.info("📝 직접 공고 내용을 붙여넣어 주세요.")
+
+    tab_url, tab_text, tab_img = st.tabs(["🔗 URL", "📝 텍스트", "🖼️ 이미지"])
+
+    # ── URL 탭 ──────────────────────────────────────────────
+    with tab_url:
+        url_input = st.text_input("채용공고 URL 붙여넣기", key="_jd_url_input")
+        if st.button("공고 불러오기", disabled=not url_input, key="_fetch_url"):
+            with st.spinner("공고를 불러오는 중..."):
+                success, result_text = fetch_jd_from_url(url_input)
+            if success:
+                st.session_state.jd_text = result_text
+                st.session_state.jd_url = url_input
+                st.session_state.pop("_jd_tab_override", None)
+                st.success("✅ 크롤링 성공!")
+            else:
+                # 폴백 1: 이미지 탭으로
+                st.session_state["_jd_tab_override"] = "image"
+                st.rerun()
+
+    # ── 텍스트 탭 ────────────────────────────────────────────
+    with tab_text:
+        manual = st.text_area("채용공고 내용 붙여넣기", height=300, key="_jd_manual")
+        if st.button("JD 등록", key="_register_text"):
+            if manual.strip():
+                st.session_state.jd_text = manual
+                st.session_state.jd_url = ""
+                st.session_state.pop("_jd_tab_override", None)
+                st.success("✅ 등록됐어요!")
+            else:
+                st.warning("내용을 입력해주세요.")
+
+    # ── 이미지 탭 ────────────────────────────────────────────
+    with tab_img:
+        uploaded_img = st.file_uploader(
+            "공고 스크린샷 업로드",
+            type=["png", "jpg", "jpeg", "webp"],
+            key="_jd_img",
+        )
+        if uploaded_img:
+            st.image(uploaded_img, use_container_width=True)
+            if st.button("이미지에서 텍스트 추출", key="_extract_img"):
+                with st.spinner("이미지를 읽는 중..."):
+                    try:
+                        text = extract_text_from_image(uploaded_img.read())
+                        if text.strip():
+                            st.session_state.jd_text = text
+                            st.session_state.jd_url = ""
+                            st.session_state.pop("_jd_tab_override", None)
+                            st.success("✅ 추출 완료!")
+                        else:
+                            # 폴백 2: 텍스트 탭으로
+                            st.session_state["_jd_tab_override"] = "text"
+                            st.rerun()
+                    except Exception:
+                        st.session_state["_jd_tab_override"] = "text"
+                        st.rerun()
+
+    # ── JD 미리보기 ─────────────────────────────────────────
+    if st.session_state.jd_text:
+        with st.expander("📄 등록된 공고 확인"):
+            st.text(st.session_state.jd_text[:500] + ("..." if len(st.session_state.jd_text) > 500 else ""))
+
+    st.divider()
+    col_prev, col_next = st.columns(2)
+    with col_prev:
+        if st.button("← 이전", use_container_width=True):
+            st.session_state.step = 1
+            st.rerun()
+    with col_next:
+        if st.button("🚀 분석 시작", type="primary", use_container_width=True,
+                     disabled=not st.session_state.jd_text.strip()):
+            events.capture("jd_registered", {"method": _detect_jd_method()})
+            events.capture("analysis_started")
+            st.session_state.step = 3
+            st.rerun()
 
 
 def render_step3() -> None:
