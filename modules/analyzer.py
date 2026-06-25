@@ -74,6 +74,21 @@ def extract_text_from_image(image_bytes: bytes) -> str:
     ])
 
 
+def _compute_score(required_matches: list[dict]) -> int:
+    if not isinstance(required_matches, list) or not required_matches:
+        return 0
+    valid = [r for r in required_matches if isinstance(r, dict)]
+    total = len(valid)
+    if total == 0:
+        return 0
+    matched = sum(1 for r in valid if str(r.get("status", "")).strip().lower() == "matched")
+    partial = sum(1 for r in valid if str(r.get("status", "")).strip().lower() == "partial")
+    return round((matched * 1 + partial * 0.5) / total * 100)
+
+
 def analyze_match(resume: str, jd: str) -> dict:
     prompt = _load_prompt(resume, jd)
-    return _parse_json(_call([{"text": prompt}], timeout=60))
+    result = _parse_json(_call([{"text": prompt}], timeout=60))
+    result.pop("score", None)
+    result["score"] = _compute_score(result.get("required_matches", []))
+    return result
