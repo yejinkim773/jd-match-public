@@ -77,12 +77,17 @@ def extract_text_from_image(image_bytes: bytes) -> str:
 def _compute_score(required_matches: list[dict]) -> int:
     if not isinstance(required_matches, list) or not required_matches:
         return 0
-    valid = [r for r in required_matches if isinstance(r, dict)]
-    total = len(valid)
+    # trait_based·out_of_scope는 점수 제외, skill_based만 반영
+    scorable = [
+        r for r in required_matches
+        if isinstance(r, dict)
+        and str(r.get("category", "skill_based")).strip().lower() == "skill_based"
+    ]
+    total = len(scorable)
     if total == 0:
         return 0
-    matched = sum(1 for r in valid if str(r.get("status", "")).strip().lower() == "matched")
-    partial = sum(1 for r in valid if str(r.get("status", "")).strip().lower() == "partial")
+    matched = sum(1 for r in scorable if str(r.get("status", "")).strip().lower() == "matched")
+    partial = sum(1 for r in scorable if str(r.get("status", "")).strip().lower() == "partial")
     return round((matched * 1 + partial * 0.5) / total * 100)
 
 

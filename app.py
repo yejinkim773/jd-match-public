@@ -300,14 +300,32 @@ def render_step4() -> None:
 
     # ── 필수요건 ──────────────────────────────────────────
     st.subheader("📋 필수요건")
-    for req in result.get("required_matches", []):
-        status = req.get("status", "unmatched")
+
+    all_reqs = result.get("required_matches", [])
+    skill_reqs  = [r for r in all_reqs if isinstance(r, dict) and str(r.get("category", "skill_based")).strip().lower() == "skill_based"]
+    trait_reqs  = [r for r in all_reqs if isinstance(r, dict) and str(r.get("category", "")).strip().lower() == "trait_based"]
+    scope_reqs  = [r for r in all_reqs if isinstance(r, dict) and str(r.get("category", "")).strip().lower() == "out_of_scope"]
+
+    for req in skill_reqs:
+        status = str(req.get("status", "unmatched")).strip().lower()
         icon = "✅" if status == "matched" else ("🔍" if status == "partial" else "❌")
         st.write(f"{icon} **{req.get('requirement', '')}**")
         if req.get("evidence"):
             st.caption(f"└ {req.get('evidence')}")
-        if status == "partial" and req.get("tip"):
+        if status in ("partial", "unmatched") and req.get("tip"):
             st.info(f"💡 {req.get('tip')}")
+
+    if trait_reqs:
+        st.caption("**성향/가치관 요건** (점수 미반영)")
+        for req in trait_reqs:
+            st.write(f"💬 **{req.get('requirement', '')}**")
+
+    if scope_reqs:
+        st.caption("**별도 확인 필요** (점수 미반영)")
+        for req in scope_reqs:
+            st.write(f"📋 **{req.get('requirement', '')}**")
+            if req.get("note"):
+                st.caption(f"└ {req.get('note')}")
 
     # ── 강점 ──────────────────────────────────────────────
     if result.get("preferred_matches"):
