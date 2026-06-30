@@ -251,8 +251,8 @@ def render_step2() -> None:
         )
 
         if _PASTE_ENABLED:
-            st.caption("또는 클립보드 이미지를 바로 붙여넣기")
-            paste_result = _paste_image_button("📋 클립보드 이미지 붙여넣기 (버튼 클릭 후 Ctrl+V)")
+            st.caption("또는 이미지를 Ctrl+C로 복사한 뒤 아래 버튼 클릭")
+            paste_result = _paste_image_button("📋 클립보드 이미지 붙여넣기 (이미지 복사 후 클릭)")
             if paste_result.image_data is not None:
                 buf = io.BytesIO()
                 paste_result.image_data.save(buf, format="PNG")
