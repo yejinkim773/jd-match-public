@@ -422,6 +422,12 @@ def render_step4() -> None:
             st.write(f"⭐ **{pref.get('requirement', '')}**")
             st.caption(f"└ {pref.get('evidence', '')}")
 
+    unmatched_prefs = result.get("preferred_unmatched", [])
+    if unmatched_prefs:
+        with st.expander(f"다른 우대사항 보기 ({len(unmatched_prefs)}개)"):
+            for pref in unmatched_prefs:
+                st.write(f"• {pref.get('requirement', '')}")
+
     # ── 총평 ──────────────────────────────────────────────
     st.subheader("📝 총평")
     st.info(result.get("summary", ""))

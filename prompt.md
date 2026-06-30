@@ -92,9 +92,10 @@ tip 작성 기준:
 
 ### 6. 우대사항 처리 규칙
 - JD에 명시된 **모든** 우대사항을 빠짐없이 검토하세요. 항목 수가 많아도 생략하지 마세요.
-- 각 항목을 이력서와 대조해 matched / partial / unmatched로 내부 판정한 뒤, **matched 항목만** `preferred_matches`에 출력하세요.
-- partial / unmatched 항목은 출력에서 제외하되, 검토 자체를 건너뛰지 마세요.
-- 우대사항이 JD에 존재하는데 `preferred_matches`가 빈 배열([])인 경우, matched 항목이 실제로 없는 것인지 반드시 재확인 후 출력하세요.
+- 각 항목을 이력서와 대조해 matched / partial / unmatched로 내부 판정한 뒤:
+  - **matched 항목**: `preferred_matches`에 requirement + evidence 포함
+  - **partial / unmatched 항목**: `preferred_unmatched`에 requirement만 포함 (evidence·tip 불필요)
+- 우대사항이 JD에 존재하는데 `preferred_matches`와 `preferred_unmatched` 모두 빈 배열([])이면 검토가 누락된 것이므로 반드시 재확인 후 출력하세요.
 
 ### 7. 범위 제한
 - JD에 명시된 항목만 평가
@@ -136,6 +137,11 @@ tip 작성 기준:
     {
       "requirement": "JD의 우대 항목 원문 (matched만 포함)",
       "evidence": "이력서 내 실제 문장 또는 경험"
+    }
+  ],
+  "preferred_unmatched": [
+    {
+      "requirement": "JD의 우대 항목 원문 (partial + unmatched 항목만)"
     }
   ],
   "summary": "3~5문장. 적합도 평가 → 핵심 강점(evidence 기반) → 보완 영역과 방향(생략 금지) → 다음 단계로 마무리. 근거 없는 과장, 불확실 추측, 이력서에 없는 내용 금지."
