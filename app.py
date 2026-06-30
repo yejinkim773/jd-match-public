@@ -103,7 +103,11 @@ def _save_pdf_preview() -> None:
 
 
 def _save_text_resume() -> None:
-    st.session_state.resume_text = st.session_state.get("_text_resume", "")
+    text = st.session_state.get("_text_resume", "")
+    # 예시 템플릿 그대로인 경우 빈값으로 처리 (템플릿이 실제 이력서로 오인되지 않도록)
+    if text.strip() == _RESUME_TEMPLATE.strip():
+        text = ""
+    st.session_state.resume_text = text
 
 
 def _char_counter(text: str) -> bool:
@@ -160,7 +164,7 @@ def render_step1() -> None:
     with tab_text:
         st.text_area(
             "이력서 내용 입력",
-            value=st.session_state.resume_text or _RESUME_TEMPLATE,
+            value=st.session_state.resume_text or "",
             height=400,
             placeholder=_RESUME_TEMPLATE,
             key="_text_resume",
