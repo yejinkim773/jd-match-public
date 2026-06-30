@@ -74,7 +74,7 @@ def extract_text_from_image(image_bytes: bytes) -> str:
     ])
 
 
-def _compute_score(required_matches: list[dict]) -> int:
+def _compute_score(required_matches: list[dict]) -> int | None:
     if not isinstance(required_matches, list) or not required_matches:
         return 0
     # trait_based·out_of_scope는 점수 제외, skill_based만 반영
@@ -85,13 +85,18 @@ def _compute_score(required_matches: list[dict]) -> int:
     ]
     total = len(scorable)
     if total == 0:
-        return 0
+        return None
     matched = sum(1 for r in scorable if str(r.get("status", "")).strip().lower() == "matched")
     partial = sum(1 for r in scorable if str(r.get("status", "")).strip().lower() == "partial")
     return round((matched * 1 + partial * 0.5) / total * 100)
 
 
+_MAX_INPUT_CHARS = 10_000
+
+
 def analyze_match(resume: str, jd: str) -> dict:
+    if len(resume) > _MAX_INPUT_CHARS or len(jd) > _MAX_INPUT_CHARS:
+        raise ValueError("too_long")
     prompt = _load_prompt(resume, jd)
     result = _parse_json(_call([{"text": prompt}], timeout=60))
     result.pop("score", None)

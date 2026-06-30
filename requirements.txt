@@ -8,3 +8,4 @@ gspread>=6.0.0
 google-auth>=2.0.0
 lxml>=5.2.0
 posthog>=3.0.0
+streamlit-paste-button>=0.1.0

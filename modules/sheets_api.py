@@ -25,7 +25,7 @@ def _feedback_sheet() -> gspread.Worksheet:
     return ws
 
 
-def save_feedback(helpful: bool, reason: str, score: int) -> None:
+def save_feedback(helpful: bool, reason: str, score: int | None) -> None:
     ws = _feedback_sheet()
     ws.append_row([
         datetime.now().isoformat(),

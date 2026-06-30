@@ -70,7 +70,8 @@ JD에서 아래 두 가지 유형으로 항목을 분류하세요:
 - 이력서상 수치가 기준을 충족 → matched
 - 기준에 못 미치지만 차이가 미미한 경우 → partial
   - 연차: 기준 대비 6개월 이내 미달 (예: 3년 요구에 2년 8개월 → partial)
-  - 그 외 수치: 기준 대비 15% 이내 미달 (예: TOEIC 900 요구에 780점 → unmatched / 860점 → partial)
+  - 그 외 수치: 요구 기준 × 0.85 이상이면 partial, 미만이면 unmatched
+    예: TOEIC 900 요구 → 900 × 0.85 = 765점. 765점 이상 900점 미만은 partial, 765점 미만은 unmatched
   - evidence에 이력서상 실제 수치 반드시 명시
 - 위 범위를 초과하는 미달 → unmatched (tip 필수)
 
@@ -90,8 +91,10 @@ tip 작성 기준:
 - 좋은 예: "GA4 기반 마케팅 성과 지표(CTR, ROAS 등)를 이력서에 수치와 함께 기재하세요"
 
 ### 6. 우대사항 처리 규칙
-- matched 항목만 출력
-- partial 또는 unmatched 항목은 출력에서 제외
+- JD에 명시된 **모든** 우대사항을 빠짐없이 검토하세요. 항목 수가 많아도 생략하지 마세요.
+- 각 항목을 이력서와 대조해 matched / partial / unmatched로 내부 판정한 뒤, **matched 항목만** `preferred_matches`에 출력하세요.
+- partial / unmatched 항목은 출력에서 제외하되, 검토 자체를 건너뛰지 마세요.
+- 우대사항이 JD에 존재하는데 `preferred_matches`가 빈 배열([])인 경우, matched 항목이 실제로 없는 것인지 반드시 재확인 후 출력하세요.
 
 ### 7. 범위 제한
 - JD에 명시된 항목만 평가

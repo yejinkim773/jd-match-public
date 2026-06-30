@@ -17,6 +17,12 @@ try:
 except Exception:
     _FEEDBACK_ENABLED = False
 
+try:
+    from streamlit_paste_button import paste_image_button as _paste_image_button
+    _PASTE_ENABLED = True
+except ImportError:
+    _PASTE_ENABLED = False
+
 
 # ── 초기화 ────────────────────────────────────────────────────
 st.set_page_config(page_title="JD 매칭 분석기", page_icon="🎯")
@@ -68,6 +74,8 @@ def render_step_indicator(current: int) -> None:
     st.divider()
 
 
+_MAX_CHARS = 10_000
+
 _RESUME_TEMPLATE = """\
 📋 학력
 예) 한국대학교 컴퓨터공학과 졸업 (2024)
@@ -96,6 +104,18 @@ def _save_pdf_preview() -> None:
 
 def _save_text_resume() -> None:
     st.session_state.resume_text = st.session_state.get("_text_resume", "")
+
+
+def _char_counter(text: str) -> bool:
+    n = len(text)
+    if n > _MAX_CHARS:
+        st.warning(
+            f"{n:,} / {_MAX_CHARS:,}자 — 입력하신 내용이 조금 길어요. "
+            "핵심적인 경력/공고 내용만 남겨주시면 더 정확하게 분석해드릴 수 있어요!"
+        )
+        return False
+    st.caption(f"{n:,} / {_MAX_CHARS:,}자")
+    return True
 
 
 def render_step1() -> None:
@@ -135,6 +155,7 @@ def render_step1() -> None:
                     on_change=_save_pdf_preview,
                 )
                 st.caption("수정하면 자동으로 반영돼요.")
+                _char_counter(st.session_state.get("_pdf_preview", st.session_state.resume_text))
 
     with tab_text:
         st.text_area(
@@ -146,10 +167,11 @@ def render_step1() -> None:
             on_change=_save_text_resume,
         )
         st.caption("수정하면 자동으로 반영돼요.")
+        _char_counter(st.session_state.get("_text_resume", ""))
 
     st.divider()
-    if st.button("다음 →", type="primary",
-                 disabled=not st.session_state.resume_text.strip()):
+    _resume_ok = bool(st.session_state.resume_text.strip()) and len(st.session_state.resume_text) <= _MAX_CHARS
+    if st.button("다음 →", type="primary", disabled=not _resume_ok):
         events.capture("resume_completed",
                        {"method": "pdf" if st.session_state.get("_last_pdf_id") else "text"})
         st.session_state.step = 2
@@ -181,23 +203,37 @@ def render_step2() -> None:
             with st.spinner("공고를 불러오는 중..."):
                 success, result_text = fetch_jd_from_url(url_input)
             if success:
-                st.session_state.jd_text = result_text
-                st.session_state.jd_url = url_input
+                st.session_state["_jd_url_preview_text"] = result_text
+                st.session_state.pop("_jd_url_edit", None)
                 st.session_state.pop("_jd_tab_override", None)
-                st.success("✅ 공고를 불러왔어요!")
-                # Change 6: 크롤링 후 정확도 확인 UX 안내
-                st.caption(
-                    "불러온 내용이 정확한지 아래 '등록된 공고 확인'에서 확인해주세요. "
-                    "내용이 빠지거나 깨져 보인다면 공고 페이지를 스크린샷으로 캡처해 '🖼️ 이미지' 탭에서 업로드하면 더 정확하게 분석할 수 있어요."
-                )
             else:
                 st.session_state["_jd_tab_override"] = "image"
                 st.rerun()
 
+        if st.session_state.get("_jd_url_preview_text"):
+            st.caption(
+                "불러온 내용을 확인하고 수정한 뒤 'JD 등록'을 눌러주세요. "
+                "광고·네비게이션 등 불필요한 내용을 삭제하면 분석 정확도가 높아져요."
+            )
+            st.text_area(
+                "불러온 공고 내용 (수정 가능)",
+                value=st.session_state["_jd_url_preview_text"],
+                height=300,
+                key="_jd_url_edit",
+            )
+            url_edit_text = st.session_state.get("_jd_url_edit", st.session_state["_jd_url_preview_text"])
+            url_within = _char_counter(url_edit_text)
+            if st.button("JD 등록", key="_register_url",
+                         disabled=not url_within or not url_edit_text.strip()):
+                st.session_state.jd_text = url_edit_text
+                st.session_state.jd_url = st.session_state.get("_jd_url_input", "")
+                st.success("✅ 등록됐어요!")
+
     # ── 텍스트 탭 ────────────────────────────────────────────
     with tab_text:
         manual = st.text_area("채용공고 내용 붙여넣기", height=300, key="_jd_manual")
-        if st.button("JD 등록", key="_register_text"):
+        text_within = _char_counter(manual)
+        if st.button("JD 등록", key="_register_text", disabled=not text_within):
             if manual.strip():
                 st.session_state.jd_text = manual
                 st.session_state.jd_url = ""
@@ -213,28 +249,64 @@ def render_step2() -> None:
             type=["png", "jpg", "jpeg", "webp"],
             key="_jd_img",
         )
+
+        if _PASTE_ENABLED:
+            st.caption("또는 클립보드 이미지를 바로 붙여넣기")
+            paste_result = _paste_image_button("📋 클립보드 이미지 붙여넣기 (버튼 클릭 후 Ctrl+V)")
+            if paste_result.image_data is not None:
+                buf = io.BytesIO()
+                paste_result.image_data.save(buf, format="PNG")
+                st.session_state["_jd_pasted_img"] = buf.getvalue()
+                st.session_state.pop("_jd_img_preview_text", None)
+                st.session_state.pop("_jd_img_edit", None)
+
+        # 파일 업로드 우선, 없으면 붙여넣기 이미지 사용
         if uploaded_img:
-            st.image(uploaded_img, use_container_width=True)
+            active_img_bytes = uploaded_img.getvalue()
+            st.image(active_img_bytes, use_container_width=True)
+        elif st.session_state.get("_jd_pasted_img"):
+            active_img_bytes = st.session_state["_jd_pasted_img"]
+            st.image(active_img_bytes, use_container_width=True)
+        else:
+            active_img_bytes = None
+
+        if active_img_bytes is not None:
             if st.button("이미지에서 텍스트 추출", key="_extract_img"):
                 with st.spinner("이미지를 읽는 중..."):
                     try:
-                        text = extract_text_from_image(uploaded_img.read())
+                        text = extract_text_from_image(active_img_bytes)
                         if text.strip():
-                            st.session_state.jd_text = text
-                            st.session_state.jd_url = ""
+                            st.session_state["_jd_img_preview_text"] = text
+                            st.session_state.pop("_jd_img_edit", None)
                             st.session_state.pop("_jd_tab_override", None)
-                            st.success("✅ 추출 완료!")
                         else:
+                            st.session_state.pop("_jd_img_preview_text", None)
                             st.session_state["_jd_tab_override"] = "text"
                             st.rerun()
                     except Exception:
+                        st.session_state.pop("_jd_img_preview_text", None)
                         st.session_state["_jd_tab_override"] = "text"
                         st.rerun()
 
-    # ── JD 미리보기 ─────────────────────────────────────────
+        if st.session_state.get("_jd_img_preview_text"):
+            st.caption("추출된 내용을 확인하고 수정한 뒤 'JD 등록'을 눌러주세요.")
+            st.text_area(
+                "추출된 공고 내용 (수정 가능)",
+                value=st.session_state["_jd_img_preview_text"],
+                height=300,
+                key="_jd_img_edit",
+            )
+            img_edit_text = st.session_state.get("_jd_img_edit", st.session_state["_jd_img_preview_text"])
+            img_within = _char_counter(img_edit_text)
+            if st.button("JD 등록", key="_register_img",
+                         disabled=not img_within or not img_edit_text.strip()):
+                st.session_state.jd_text = img_edit_text
+                st.session_state.jd_url = ""
+                st.success("✅ 등록됐어요!")
+
+    # ── 등록 상태 ────────────────────────────────────────────
     if st.session_state.jd_text:
-        with st.expander("📄 등록된 공고 확인"):
-            st.text(st.session_state.jd_text[:500] + ("..." if len(st.session_state.jd_text) > 500 else ""))
+        st.caption(f"✅ 공고 등록됨 ({len(st.session_state.jd_text):,}자)")
 
     st.divider()
     col_prev, col_next = st.columns(2)
@@ -243,8 +315,8 @@ def render_step2() -> None:
             st.session_state.step = 1
             st.rerun()
     with col_next:
-        if st.button("🚀 분석 시작", type="primary", use_container_width=True,
-                     disabled=not st.session_state.jd_text.strip()):
+        _jd_ok = bool(st.session_state.jd_text.strip()) and len(st.session_state.jd_text) <= _MAX_CHARS
+        if st.button("🚀 분석 시작", type="primary", use_container_width=True, disabled=not _jd_ok):
             events.capture("jd_registered", {"method": _detect_jd_method()})
             events.capture("analysis_started")
             st.session_state.step = 3
@@ -261,15 +333,23 @@ def render_step3() -> None:
                 st.session_state.resume_text,
                 st.session_state.jd_text,
             )
+        except ValueError as e:
+            if str(e) == "too_long":
+                st.error("입력하신 내용이 조금 길어요. 핵심적인 경력/공고 내용만 남겨주시면 더 정확하게 분석해드릴 수 있어요!")
+            else:
+                st.error("분석 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.")
+            if st.button("← 돌아가기"):
+                st.session_state.step = 2
+                st.rerun()
+            return
         except Exception:
-            # Change 3: 사용자 친화적 오류 메시지
             st.error("분석 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.")
             if st.button("← 돌아가기"):
                 st.session_state.step = 2
                 st.rerun()
             return
 
-    events.capture("analysis_completed", {"score": result.get("score", 0)})
+    events.capture("analysis_completed", {"score": result.get("score") or 0})
     st.session_state.analysis_result = result
     st.session_state.step = 4
     st.rerun()
@@ -291,12 +371,15 @@ def render_step4() -> None:
     )
 
     # ── 스코어 ────────────────────────────────────────────
-    color = "🟢" if score >= 70 else ("🟡" if score >= 50 else "🔴")
-    col_score, col_bar = st.columns([1, 3])
-    with col_score:
-        st.metric("매칭 스코어", f"{color} {score}점")
-    with col_bar:
-        st.progress(score / 100)
+    if score is None:
+        st.info("ℹ️ 평가 가능한 기술 요건이 없어 점수를 산출할 수 없어요.")
+    else:
+        color = "🟢" if score >= 70 else ("🟡" if score >= 50 else "🔴")
+        col_score, col_bar = st.columns([1, 3])
+        with col_score:
+            st.metric("매칭 스코어", f"{color} {score}점")
+        with col_bar:
+            st.progress(score / 100)
 
     # ── 필수요건 ──────────────────────────────────────────
     st.subheader("📋 필수요건")
@@ -378,7 +461,7 @@ def render_step4() -> None:
     copy_text = (
         f"[JD 매칭 분석기]\n"
         f"{result.get('company', '')} · {result.get('position', '')}\n"
-        f"매칭 스코어: {score}점\n\n"
+        f"매칭 스코어: {f'{score}점' if score is not None else '평가 불가'}\n\n"
         f"{result.get('summary', '')}"
     )
     col_copy, col_img, col_share = st.columns(3)
@@ -438,7 +521,7 @@ def render_step4() -> None:
         _reset()
 
 
-def _submit_feedback(helpful: bool, reason: str, score: int) -> None:
+def _submit_feedback(helpful: bool, reason: str, score: int | None) -> None:
     if _FEEDBACK_ENABLED:
         try:
             _save_feedback(helpful=helpful, reason=reason, score=score)
