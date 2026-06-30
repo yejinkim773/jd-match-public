@@ -235,12 +235,74 @@ def _fetch_ninehire(url: str) -> tuple[bool, str]:
     return False, "ninehire 공고를 자동으로 읽지 못했어요. 공고 화면을 캡처해서 '이미지 업로드'로 분석해보세요."
 
 
+# ── 원티드 전용 크롤러 ────────────────────────────────────────
+
+_WANTED_API = "https://www.wanted.co.kr/api/v4/jobs"
+_WANTED_HEADERS = {
+    **HEADERS,
+    "want-country-code": "KR",
+    "want-language": "ko",
+    "Referer": "https://www.wanted.co.kr/",
+}
+
+
+def _fetch_wanted(url: str) -> tuple[bool, str]:
+    """원티드 전용 크롤러. 공개 API 직접 호출로 전체 JD 구조화 추출."""
+    match = re.search(r'/wd/(\d+)', url)
+    if not match:
+        return False, "공고 ID를 URL에서 찾지 못했어요"
+    job_id = match.group(1)
+
+    try:
+        resp = requests.get(f"{_WANTED_API}/{job_id}", headers=_WANTED_HEADERS, timeout=10)
+        if resp.status_code == 404:
+            return False, "공고가 마감됐거나 존재하지 않아요"
+        resp.raise_for_status()
+        data = resp.json()
+    except requests.exceptions.HTTPError as e:
+        return False, f"원티드 API 오류 ({e.response.status_code})"
+    except Exception as e:
+        return False, str(e)
+
+    job = data.get("job", {})
+    parts = []
+
+    company_name = job.get("company", {}).get("name", "")
+    if company_name:
+        parts.append(f"회사: {company_name}")
+    if job.get("position"):
+        parts.append(f"직무: {job['position']}")
+
+    detail = job.get("detail", {})
+    for key, label in [
+        ("intro",            "직무 소개"),
+        ("main_tasks",       "주요 업무"),
+        ("requirements",     "자격요건"),
+        ("preferred_points", "우대사항"),
+        ("benefits",         "혜택 및 복지"),
+    ]:
+        val = (detail.get(key) or "").strip()
+        if val:
+            clean = BeautifulSoup(val, "lxml").get_text(separator="\n").strip()
+            parts.append(f"{label}:\n{clean}")
+
+    if job.get("due_time"):
+        parts.append(f"마감일: {job['due_time']}")
+
+    text = "\n\n".join(parts)
+    if not text.strip():
+        return False, "원티드 공고 내용을 읽지 못했어요"
+    return True, text[:20000]
+
+
 # ── 범용 크롤러 ──────────────────────────────────────────────
 
 def fetch_jd_from_url(url: str) -> tuple[bool, str]:
     """Returns (success, text_or_error_message)."""
     try:
         # 사이트별 전용 크롤러 라우팅
+        if "wanted.co.kr" in url:
+            return _fetch_wanted(url)
         if "jobkorea.co.kr" in url:
             return _fetch_jobkorea(url)
         if "saramin.co.kr" in url:
