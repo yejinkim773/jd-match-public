@@ -38,7 +38,7 @@ def generate_result_image(result: dict) -> bytes:
 
     # 헤더 배경
     draw.rectangle([0, 0, _W, _HEADER_H], fill=_HEADER_BG)
-    draw.text((24, 18), "🎯 JD 매칭 분석기", fill="#FFFFFF", font=_font(20))
+    draw.text((24, 18), "JD 매칭 분석기", fill="#FFFFFF", font=_font(20))
 
     # 회사 · 포지션
     company = result.get("company", "")

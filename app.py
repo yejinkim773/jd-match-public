@@ -1,8 +1,10 @@
 import io
+import json
 from pathlib import Path
 
 import pdfplumber
 import streamlit as st
+import streamlit.components.v1 as components
 
 import modules.events as events
 from modules.analyzer import analyze_match, extract_text_from_image
@@ -338,44 +340,84 @@ def render_step4() -> None:
                  "이력서를 잘 못 읽은 것 같아요", "기타"],
                 key="_feedback_reason",
             )
+            other_text = ""
+            if reason == "기타":
+                other_text = st.text_area(
+                    "어떤 점이 아쉬웠는지 알려주세요 (선택)",
+                    placeholder="자유롭게 적어주세요",
+                    key="_feedback_other",
+                    height=100,
+                )
             if st.button("제출", type="primary"):
-                _submit_feedback(helpful=False, reason=reason, score=score)
+                final_reason = f"기타: {other_text.strip()}" if reason == "기타" and other_text.strip() else reason
+                _submit_feedback(helpful=False, reason=final_reason, score=score)
     else:
         st.success("피드백 감사해요! 🙏")
 
     st.divider()
 
     # ── 공유 / 재분석 ──────────────────────────────────────
-    col_copy, col_img, col_reset = st.columns(3)
+    copy_text = (
+        f"[JD 매칭 분석기]\n"
+        f"{result.get('company', '')} · {result.get('position', '')}\n"
+        f"매칭 스코어: {score}점\n\n"
+        f"{result.get('summary', '')}"
+    )
+    col_copy, col_img, col_share = st.columns(3)
 
     with col_copy:
-        copy_text = (
-            f"[JD 매칭 분석기]\n"
-            f"{result.get('company', '')} · {result.get('position', '')}\n"
-            f"매칭 스코어: {score}점\n\n"
-            f"{result.get('summary', '')}"
-        )
-        st.download_button(
-            "📋 텍스트 복사",
-            data=copy_text,
-            file_name="jd_match_result.txt",
-            mime="text/plain",
-            use_container_width=True,
-        )
+        # JS 클립보드 복사 (다운로드 없이 바로 복사)
+        components.html(f"""
+        <button id="copyBtn" onclick="
+          navigator.clipboard.writeText({json.dumps(copy_text)}).then(() => {{
+            document.getElementById('copyBtn').innerText = '✅ 복사됐어요!';
+            setTimeout(() => document.getElementById('copyBtn').innerText = '📋 텍스트 복사', 2000);
+          }}).catch(() => {{
+            var ta = document.createElement('textarea');
+            ta.value = {json.dumps(copy_text)};
+            document.body.appendChild(ta); ta.select();
+            document.execCommand('copy'); document.body.removeChild(ta);
+            document.getElementById('copyBtn').innerText = '✅ 복사됐어요!';
+            setTimeout(() => document.getElementById('copyBtn').innerText = '📋 텍스트 복사', 2000);
+          }});" style="background:white;color:#1E293B;border:1px solid #D1D5DB;
+          padding:8px 0;border-radius:6px;font-size:14px;cursor:pointer;width:100%;">
+          📋 텍스트 복사</button>
+        """, height=45)
 
     with col_img:
-        img_bytes = generate_result_image(result)
-        st.download_button(
-            "🖼️ 이미지 저장",
-            data=img_bytes,
-            file_name="jd_match_result.png",
-            mime="image/png",
-            use_container_width=True,
-        )
+        try:
+            img_bytes = generate_result_image(result)
+            st.download_button(
+                "🖼️ 이미지 저장",
+                data=img_bytes,
+                file_name="jd_match_result.png",
+                mime="image/png",
+                use_container_width=True,
+            )
+        except Exception:
+            st.caption("이미지 생성에 실패했어요.")
 
-    with col_reset:
-        if st.button("🔄 다시 분석하기", use_container_width=True):
-            _reset()
+    with col_share:
+        # Web Share API (모바일 네이티브 공유) → 미지원 시 링크 복사
+        components.html("""
+        <button onclick="
+          if (navigator.share) {
+            navigator.share({title:'JD 매칭 분석기',
+              text:'이력서 × JD 매칭을 AI로 분석해보세요!',
+              url:window.location.href});
+          } else {
+            navigator.clipboard.writeText(window.location.href).then(() => {
+              this.innerText = '✅ 링크 복사됨!';
+              setTimeout(() => this.innerText = '🔗 공유하기', 2000);
+            });
+          }" style="background:#10B981;color:white;border:none;
+          padding:8px 0;border-radius:6px;font-size:14px;cursor:pointer;width:100%;">
+          🔗 공유하기</button>
+        """, height=45)
+
+    st.divider()
+    if st.button("🔄 다시 분석하기", use_container_width=True):
+        _reset()
 
 
 def _submit_feedback(helpful: bool, reason: str, score: int) -> None:
