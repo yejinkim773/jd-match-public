@@ -310,6 +310,8 @@ def render_step2() -> None:
     # ── 등록 상태 ────────────────────────────────────────────
     if st.session_state.jd_text:
         st.caption(f"✅ 공고 등록됨 ({len(st.session_state.jd_text):,}자)")
+        with st.expander("📄 등록된 공고 확인 (선택)"):
+            st.text(st.session_state.jd_text)
 
     st.divider()
     col_prev, col_next = st.columns(2)
