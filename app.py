@@ -256,9 +256,12 @@ def render_step2() -> None:
             if paste_result.image_data is not None:
                 buf = io.BytesIO()
                 paste_result.image_data.save(buf, format="PNG")
-                st.session_state["_jd_pasted_img"] = buf.getvalue()
-                st.session_state.pop("_jd_img_preview_text", None)
-                st.session_state.pop("_jd_img_edit", None)
+                new_bytes = buf.getvalue()
+                # 새 이미지일 때만 OCR 텍스트 초기화 (rerun마다 재발화 방지)
+                if new_bytes != st.session_state.get("_jd_pasted_img"):
+                    st.session_state["_jd_pasted_img"] = new_bytes
+                    st.session_state.pop("_jd_img_preview_text", None)
+                    st.session_state.pop("_jd_img_edit", None)
 
         # 파일 업로드 우선, 없으면 붙여넣기 이미지 사용
         if uploaded_img:
