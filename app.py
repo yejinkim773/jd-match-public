@@ -43,23 +43,29 @@ if not st.session_state.app_loaded_captured:
 
 # ── 스텝 인디케이터 ───────────────────────────────────────────
 def render_step_indicator(current: int) -> None:
+    # Change 1: 모든 스텝을 클릭 가능한 버튼으로 변경
+    # Change 4: current를 min(...,3) 없이 그대로 받아 step=4시 ③도 ✅로 표시
     labels = ["① 이력서", "② JD 입력", "③ 결과"]
+    targets = [1, 2, 4]
     cols = st.columns(3)
-    for i, (col, label) in enumerate(zip(cols, labels), start=1):
+    for i, (col, label, target) in enumerate(zip(cols, labels, targets), start=1):
         with col:
             if i < current:
-                st.markdown(f"<p style='text-align:center;color:#10B981'>✅ {label}</p>",
-                            unsafe_allow_html=True)
+                if st.button(f"✅ {label}", key=f"_nav_{i}", use_container_width=True):
+                    st.session_state.step = target
+                    st.rerun()
             elif i == current:
-                st.markdown(f"<p style='text-align:center;font-weight:700'>{label}</p>",
-                            unsafe_allow_html=True)
+                st.markdown(
+                    f"<p style='text-align:center;font-weight:700;padding:6px 0'>{label}</p>",
+                    unsafe_allow_html=True,
+                )
             else:
-                st.markdown(f"<p style='text-align:center;color:#94A3B8'>{label}</p>",
-                            unsafe_allow_html=True)
+                if st.button(label, key=f"_nav_{i}", use_container_width=True):
+                    st.session_state.step = target
+                    st.rerun()
     st.divider()
 
 
-# ── 스텝별 렌더 함수 (다음 Task에서 구현) ─────────────────────
 _RESUME_TEMPLATE = """\
 📋 학력
 예) 한국대학교 컴퓨터공학과 졸업 (2024)
@@ -81,8 +87,19 @@ _RESUME_TEMPLATE = """\
 """
 
 
+# Change 5: on_change로 text_area 편집 시 즉시 resume_text에 반영
+def _save_pdf_preview() -> None:
+    st.session_state.resume_text = st.session_state.get("_pdf_preview", "")
+
+
+def _save_text_resume() -> None:
+    st.session_state.resume_text = st.session_state.get("_text_resume", "")
+
+
 def render_step1() -> None:
     st.subheader("이력서를 입력해주세요")
+    # Change 2: 개인정보 안내 문구
+    st.info("🔒 입력하신 정보는 분석에만 사용되며, 서버에 저장되지 않습니다.")
 
     tab_pdf, tab_text = st.tabs(["📄 PDF 업로드", "✏️ 직접 입력"])
 
@@ -102,24 +119,31 @@ def render_step1() -> None:
                 if extracted:
                     st.session_state.resume_text = extracted
                     st.session_state["_last_pdf_id"] = file_id
-                    st.success("✅ 텍스트 추출 완료! 아래에서 확인하세요.")
+                    # Change 5: 텍스트 탭 위젯 초기화 → 다음 렌더링 시 추출된 텍스트로 재초기화
+                    st.session_state.pop("_text_resume", None)
+                    st.success("✅ 텍스트 추출 완료! 아래에서 내용을 확인하고 수정할 수 있어요.")
                 else:
                     st.warning("⚠️ 이 PDF에서 텍스트를 읽지 못했어요. '직접 입력' 탭을 이용해주세요.")
             if st.session_state.resume_text:
-                st.text_area("추출된 이력서 (수정 가능)", value=st.session_state.resume_text,
-                             height=300, key="_pdf_preview")
+                st.text_area(
+                    "추출된 이력서",
+                    value=st.session_state.resume_text,
+                    height=300,
+                    key="_pdf_preview",
+                    on_change=_save_pdf_preview,
+                )
+                st.caption("수정하면 자동으로 반영돼요.")
 
     with tab_text:
-        edited = st.text_area(
+        st.text_area(
             "이력서 내용 입력",
             value=st.session_state.resume_text or _RESUME_TEMPLATE,
             height=400,
             placeholder=_RESUME_TEMPLATE,
             key="_text_resume",
+            on_change=_save_text_resume,
         )
-        if st.button("✅ 이력서 저장", type="secondary"):
-            st.session_state.resume_text = edited
-            st.success("저장됐어요!")
+        st.caption("수정하면 자동으로 반영돼요.")
 
     st.divider()
     if st.button("다음 →", type="primary",
@@ -141,7 +165,6 @@ def _detect_jd_method() -> str:
 def render_step2() -> None:
     st.subheader("채용공고를 입력해주세요")
 
-    # 폴백으로 탭 강제 이동 시 안내 메시지 표시
     if st.session_state.get("_jd_tab_override") == "image":
         st.warning("📸 자동으로 읽어오지 못했어요. 공고 스크린샷을 업로드해주세요.")
     elif st.session_state.get("_jd_tab_override") == "text":
@@ -159,9 +182,13 @@ def render_step2() -> None:
                 st.session_state.jd_text = result_text
                 st.session_state.jd_url = url_input
                 st.session_state.pop("_jd_tab_override", None)
-                st.success("✅ 크롤링 성공!")
+                st.success("✅ 공고를 불러왔어요!")
+                # Change 6: 크롤링 후 정확도 확인 UX 안내
+                st.caption(
+                    "불러온 내용이 정확한지 아래 '등록된 공고 확인'에서 확인해주세요. "
+                    "내용이 빠지거나 깨져 보인다면 공고 페이지를 스크린샷으로 캡처해 '🖼️ 이미지' 탭에서 업로드하면 더 정확하게 분석할 수 있어요."
+                )
             else:
-                # 폴백 1: 이미지 탭으로
                 st.session_state["_jd_tab_override"] = "image"
                 st.rerun()
 
@@ -196,7 +223,6 @@ def render_step2() -> None:
                             st.session_state.pop("_jd_tab_override", None)
                             st.success("✅ 추출 완료!")
                         else:
-                            # 폴백 2: 텍스트 탭으로
                             st.session_state["_jd_tab_override"] = "text"
                             st.rerun()
                     except Exception:
@@ -233,8 +259,9 @@ def render_step3() -> None:
                 st.session_state.resume_text,
                 st.session_state.jd_text,
             )
-        except Exception as e:
-            st.error(f"분석 중 오류가 발생했어요: {e}")
+        except Exception:
+            # Change 3: 사용자 친화적 오류 메시지
+            st.error("분석 중 오류가 발생했어요. 잠시 후 다시 시도해주세요.")
             if st.button("← 돌아가기"):
                 st.session_state.step = 2
                 st.rerun()
@@ -376,7 +403,8 @@ def _reset() -> None:
 
 
 # ── 라우팅 ────────────────────────────────────────────────────
-render_step_indicator(min(st.session_state.step, 3))
+# Change 4: min(..., 3) 제거 → step=4일 때 ③도 ✅로 표시
+render_step_indicator(st.session_state.step)
 
 step = st.session_state.step
 if step == 1:
