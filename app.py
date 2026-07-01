@@ -241,6 +241,7 @@ def render_step1() -> None:
                     st.session_state.resume_text = extracted
                     st.session_state["_last_pdf_id"] = file_id
                     st.session_state["_text_resume"] = extracted
+                    st.session_state["_resume_method"] = "pdf"
                     st.success("✅ 텍스트 추출 완료! 아래에서 내용을 확인하고 수정할 수 있어요.")
                 else:
                     st.warning("⚠️ 이 PDF에서 텍스트를 읽지 못했어요. '직접 입력' 탭을 이용해주세요.")
