@@ -213,7 +213,7 @@ def render_step1() -> None:
     # Change 2: 개인정보 안내 문구
     st.info("🔒 입력하신 정보는 분석에만 사용되며, 서버에 저장되지 않습니다.")
 
-    tab_pdf, tab_text = st.tabs(["📄 PDF 업로드", "✏️ 직접 입력"])
+    tab_pdf, tab_text, tab_img_r = st.tabs(["📄 PDF 업로드", "✏️ 직접 입력", "🖼️ 이미지"])
 
     with tab_pdf:
         uploaded = st.file_uploader(
@@ -259,6 +259,51 @@ def render_step1() -> None:
         st.caption("수정하면 자동으로 반영돼요.")
         _char_counter(st.session_state.get("_text_resume", ""))
 
+    with tab_img_r:
+        uploaded_resume_img = st.file_uploader(
+            "이력서 이미지 업로드",
+            type=["png", "jpg", "jpeg", "webp"],
+            key="_resume_img",
+            help="이력서 사진이나 스캔본을 올려주세요",
+        )
+        # 새 이미지 업로드 시 OCR 결과 초기화
+        r_fp = f"{uploaded_resume_img.name}:{uploaded_resume_img.size}" if uploaded_resume_img else ""
+        if r_fp != st.session_state.get("_resume_img_fp", ""):
+            st.session_state["_resume_img_fp"] = r_fp
+            st.session_state.pop("_resume_img_preview_text", None)
+            st.session_state.pop("_resume_img_edit", None)
+
+        if uploaded_resume_img:
+            st.image(uploaded_resume_img.getvalue(), use_container_width=True)
+            if st.button("이미지에서 텍스트 추출", key="_extract_resume_img"):
+                with st.spinner("이미지를 읽는 중..."):
+                    try:
+                        text = extract_text_from_image(uploaded_resume_img.getvalue())
+                        if text.strip():
+                            st.session_state["_resume_img_preview_text"] = text
+                            st.session_state.pop("_resume_img_edit", None)
+                        else:
+                            st.warning("이미지에서 텍스트를 읽지 못했어요. PDF 업로드나 직접 입력을 이용해주세요.")
+                    except Exception:
+                        st.warning("이미지 읽기 중 오류가 발생했어요. PDF 업로드나 직접 입력을 이용해주세요.")
+
+        if st.session_state.get("_resume_img_preview_text"):
+            st.caption("추출된 내용을 확인하고 수정한 뒤 '이력서 등록'을 눌러주세요.")
+            st.text_area(
+                "추출된 이력서 내용 (수정 가능)",
+                value=st.session_state["_resume_img_preview_text"],
+                height=300,
+                key="_resume_img_edit",
+            )
+            resume_img_edit = st.session_state.get("_resume_img_edit", st.session_state["_resume_img_preview_text"])
+            resume_img_within = _char_counter(resume_img_edit)
+            if st.button("이력서 등록", key="_register_resume_img",
+                         disabled=not resume_img_within or not resume_img_edit.strip()):
+                st.session_state.resume_text = resume_img_edit
+                st.session_state.pop("_last_pdf_id", None)
+                st.session_state.pop("_text_resume", None)
+                st.success("✅ 등록됐어요!")
+
     st.divider()
     st.caption(
         "📌 PDF 이력서는 레이아웃에 따라 텍스트가 일부 뒤섞일 수 있어요. "
@@ -277,7 +322,7 @@ def render_step1() -> None:
 def _detect_jd_method() -> str:
     if st.session_state.jd_url:
         return "url"
-    if st.session_state.get("_jd_img"):
+    if st.session_state.get("_jd_imgs") or st.session_state.get("_jd_pasted_img"):
         return "image"
     return "text"
 
@@ -285,15 +330,14 @@ def _detect_jd_method() -> str:
 def render_step2() -> None:
     st.subheader("채용공고를 입력해주세요")
 
-    if st.session_state.get("_jd_tab_override") == "image":
-        st.warning("📸 자동으로 읽어오지 못했어요. 공고 스크린샷을 업로드해주세요.")
-    elif st.session_state.get("_jd_tab_override") == "text":
-        st.info("📝 직접 공고 내용을 붙여넣어 주세요.")
+    if st.session_state.get("_jd_tab_override") == "text":
+        st.info("📝 이미지에서 텍스트를 읽지 못했어요. 공고 내용을 직접 붙여넣기 해주세요.")
 
-    tab_url, tab_text, tab_img = st.tabs(["🔗 URL", "📝 텍스트", "🖼️ 이미지"])
+    tab_img, tab_text, tab_url = st.tabs(["🖼️ 이미지", "📝 텍스트", "🔗 URL"])
 
     # ── URL 탭 ──────────────────────────────────────────────
     with tab_url:
+        st.caption("💡 채용 사이트나 공고 형식에 따라 불러오기가 안 될 수 있어요. 이 경우 공고 화면을 캡처해 이미지로 올리거나, 내용을 직접 복사해 텍스트로 붙여넣기 해주세요.")
         url_input = st.text_input("채용공고 URL 붙여넣기", key="_jd_url_input")
         if st.button("공고 불러오기", disabled=not url_input, key="_fetch_url"):
             with st.spinner("공고를 불러오는 중..."):
@@ -302,9 +346,17 @@ def render_step2() -> None:
                 st.session_state["_jd_url_preview_text"] = result_text
                 st.session_state.pop("_jd_url_edit", None)
                 st.session_state.pop("_jd_tab_override", None)
+                st.session_state.pop("_jd_url_fetch_failed", None)
             else:
-                st.session_state["_jd_tab_override"] = "image"
+                st.session_state["_jd_url_fetch_failed"] = True
                 st.rerun()
+
+        if st.session_state.get("_jd_url_fetch_failed"):
+            st.warning(
+                "해당 공고를 자동으로 불러오지 못했어요.  \n"
+                "**이미지 탭**에서 공고 스크린샷을 업로드하거나, "
+                "**텍스트 탭**에서 내용을 직접 붙여넣기 해주세요."
+            )
 
         if st.session_state.get("_jd_url_preview_text"):
             st.caption(
@@ -325,26 +377,20 @@ def render_step2() -> None:
                 st.session_state.jd_url = st.session_state.get("_jd_url_input", "")
                 st.success("✅ 등록됐어요!")
 
-    # ── 텍스트 탭 ────────────────────────────────────────────
-    with tab_text:
-        manual = st.text_area("채용공고 내용 붙여넣기", height=300, key="_jd_manual")
-        text_within = _char_counter(manual)
-        if st.button("JD 등록", key="_register_text", disabled=not text_within):
-            if manual.strip():
-                st.session_state.jd_text = manual
-                st.session_state.jd_url = ""
-                st.session_state.pop("_jd_tab_override", None)
-                st.success("✅ 등록됐어요!")
-            else:
-                st.warning("내용을 입력해주세요.")
-
     # ── 이미지 탭 ────────────────────────────────────────────
     with tab_img:
-        uploaded_img = st.file_uploader(
-            "공고 스크린샷 업로드",
+        uploaded_imgs = st.file_uploader(
+            "공고 스크린샷 업로드 (여러 장 가능)",
             type=["png", "jpg", "jpeg", "webp"],
-            key="_jd_img",
+            key="_jd_imgs",
+            accept_multiple_files=True,
         )
+        # 업로드 파일이 바뀌면 OCR 결과 초기화
+        new_imgs_fp = "|".join(f"{f.name}:{f.size}" for f in uploaded_imgs) if uploaded_imgs else ""
+        if new_imgs_fp != st.session_state.get("_jd_imgs_fp", ""):
+            st.session_state["_jd_imgs_fp"] = new_imgs_fp
+            st.session_state.pop("_jd_img_preview_text", None)
+            st.session_state.pop("_jd_img_edit", None)
 
         if _PASTE_ENABLED:
             st.caption("또는 이미지를 Ctrl+C로 복사한 뒤 아래 버튼 클릭")
@@ -353,36 +399,45 @@ def render_step2() -> None:
                 buf = io.BytesIO()
                 paste_result.image_data.save(buf, format="PNG")
                 new_bytes = buf.getvalue()
-                # 새 이미지일 때만 OCR 텍스트 초기화 (rerun마다 재발화 방지)
                 if new_bytes != st.session_state.get("_jd_pasted_img"):
                     st.session_state["_jd_pasted_img"] = new_bytes
                     st.session_state.pop("_jd_img_preview_text", None)
                     st.session_state.pop("_jd_img_edit", None)
 
-        # 파일 업로드 우선, 없으면 붙여넣기 이미지 사용
-        if uploaded_img:
-            active_img_bytes = uploaded_img.getvalue()
-            st.image(active_img_bytes, use_container_width=True)
+        # 활성 이미지 목록: 파일 업로드 우선, 없으면 붙여넣기
+        if uploaded_imgs:
+            active_imgs_bytes = [f.getvalue() for f in uploaded_imgs]
         elif st.session_state.get("_jd_pasted_img"):
-            active_img_bytes = st.session_state["_jd_pasted_img"]
-            st.image(active_img_bytes, use_container_width=True)
+            active_imgs_bytes = [st.session_state["_jd_pasted_img"]]
         else:
-            active_img_bytes = None
+            active_imgs_bytes = []
 
-        if active_img_bytes is not None:
-            if st.button("이미지에서 텍스트 추출", key="_extract_img"):
+        if active_imgs_bytes:
+            if len(active_imgs_bytes) == 1:
+                st.image(active_imgs_bytes[0], use_container_width=True)
+            else:
+                img_cols = st.columns(min(len(active_imgs_bytes), 3))
+                for i, b in enumerate(active_imgs_bytes):
+                    with img_cols[i % 3]:
+                        st.image(b, caption=f"{i + 1}번", use_container_width=True)
+
+            btn_label = f"이미지 {len(active_imgs_bytes)}장에서 텍스트 추출" if len(active_imgs_bytes) > 1 else "이미지에서 텍스트 추출"
+            if st.button(btn_label, key="_extract_imgs"):
                 with st.spinner("이미지를 읽는 중..."):
-                    try:
-                        text = extract_text_from_image(active_img_bytes)
-                        if text.strip():
-                            st.session_state["_jd_img_preview_text"] = text
-                            st.session_state.pop("_jd_img_edit", None)
-                            st.session_state.pop("_jd_tab_override", None)
-                        else:
-                            st.session_state.pop("_jd_img_preview_text", None)
-                            st.session_state["_jd_tab_override"] = "text"
-                            st.rerun()
-                    except Exception:
+                    texts = []
+                    for b in active_imgs_bytes:
+                        try:
+                            t = extract_text_from_image(b)
+                            if t.strip():
+                                texts.append(t)
+                        except Exception:
+                            pass
+                    combined = "\n\n".join(texts) if texts else ""
+                    if combined:
+                        st.session_state["_jd_img_preview_text"] = combined
+                        st.session_state.pop("_jd_img_edit", None)
+                        st.session_state.pop("_jd_tab_override", None)
+                    else:
                         st.session_state.pop("_jd_img_preview_text", None)
                         st.session_state["_jd_tab_override"] = "text"
                         st.rerun()
@@ -402,6 +457,19 @@ def render_step2() -> None:
                 st.session_state.jd_text = img_edit_text
                 st.session_state.jd_url = ""
                 st.success("✅ 등록됐어요!")
+
+    # ── 텍스트 탭 ────────────────────────────────────────────
+    with tab_text:
+        manual = st.text_area("채용공고 내용 붙여넣기", height=300, key="_jd_manual")
+        text_within = _char_counter(manual)
+        if st.button("JD 등록", key="_register_text", disabled=not text_within):
+            if manual.strip():
+                st.session_state.jd_text = manual
+                st.session_state.jd_url = ""
+                st.session_state.pop("_jd_tab_override", None)
+                st.success("✅ 등록됐어요!")
+            else:
+                st.warning("내용을 입력해주세요.")
 
     # ── 등록 상태 ────────────────────────────────────────────
     if st.session_state.jd_text:
