@@ -327,7 +327,10 @@ def render_step1() -> None:
                 st.session_state.pop("_text_resume", None)
                 st.session_state.pop("_pdf_preview", None)
                 st.session_state.pop("_pdf_extracted_original", None)
-                st.success("✅ 등록됐어요!")
+                # 등록 후 OCR 편집 영역 숨김 (되돌리기가 등록 철회처럼 보이는 문제 방지)
+                st.session_state.pop("_resume_img_preview_text", None)
+                st.session_state.pop("_resume_img_edit", None)
+                st.rerun()
 
     st.divider()
     if st.session_state.resume_text:
@@ -410,7 +413,9 @@ def render_step2() -> None:
                          disabled=not url_within or not url_edit_text.strip()):
                 st.session_state.jd_text = url_edit_text
                 st.session_state.jd_url = st.session_state.get("_jd_url_input", "")
-                st.success("✅ 등록됐어요!")
+                st.session_state.pop("_jd_url_preview_text", None)
+                st.session_state.pop("_jd_url_edit", None)
+                st.rerun()
 
     # ── 이미지 탭 ────────────────────────────────────────────
     with tab_img:
@@ -492,7 +497,9 @@ def render_step2() -> None:
                          disabled=not img_within or not img_edit_text.strip()):
                 st.session_state.jd_text = img_edit_text
                 st.session_state.jd_url = ""
-                st.success("✅ 등록됐어요!")
+                st.session_state.pop("_jd_img_preview_text", None)
+                st.session_state.pop("_jd_img_edit", None)
+                st.rerun()
 
     # ── 텍스트 탭 ────────────────────────────────────────────
     with tab_text:
