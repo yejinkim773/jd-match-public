@@ -7,7 +7,11 @@ _client = None
 def init(api_key: str) -> None:
     from posthog import Posthog
     global _client
-    _client = Posthog(project_api_key=api_key, host="https://app.posthog.com")
+    _client = Posthog(
+        project_api_key=api_key,
+        host="https://us.i.posthog.com",
+        flush_at=1,
+    )
 
 
 def _session_id() -> str:
