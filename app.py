@@ -745,6 +745,13 @@ def render_step4() -> None:
     """, height=45)
 
     st.divider()
+    st.markdown(
+        "💬 FitCheck 개선에 의견을 남겨주세요 &nbsp;→&nbsp; "
+        "[**설문 참여하기**](https://forms.gle/y8x8xDCvqT5j61ae6)",
+        unsafe_allow_html=True,
+    )
+
+    st.divider()
     if st.button("🔄 다시 분석하기", use_container_width=True):
         _reset()
 
