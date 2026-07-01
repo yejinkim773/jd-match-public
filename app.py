@@ -30,7 +30,7 @@ except ImportError:
 
 
 # ── 초기화 ────────────────────────────────────────────────────
-st.set_page_config(page_title="JD 매칭 분석기", page_icon="🎯")
+st.set_page_config(page_title="FitCheck", page_icon="✓")
 
 _posthog_key = st.secrets.get("POSTHOG_KEY", "")
 if _posthog_key:
@@ -793,9 +793,23 @@ def _reset() -> None:
     st.rerun()
 
 
+# ── 헤더 ──────────────────────────────────────────────────────
+st.markdown(
+    """
+    <div style="text-align:center; padding:32px 0 20px 0;">
+      <div style="font-size:2.4rem; font-weight:800; letter-spacing:-1px; color:#1E293B;">
+        Fit<span style="color:#10B981;">✓</span>Check
+      </div>
+      <div style="margin-top:8px; font-size:1.05rem; color:#64748B;">
+        내 이력서, 이 공고에 맞나요?
+      </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
 # ── 라우팅 ────────────────────────────────────────────────────
 _sync_daily_count()
-# Change 4: min(..., 3) 제거 → step=4일 때 ③도 ✅로 표시
 render_step_indicator(st.session_state.step)
 
 step = st.session_state.step
