@@ -90,6 +90,24 @@ _GRADE_COLORS = {
     "추가 준비 필요":   "#F97316",
 }
 
+_NEGATIVE_OPTIONS = [
+    "필수요건 판정이 맞지 않아요",
+    "등급/적합도가 납득이 안 돼요",
+    "분석 항목이 빠지거나 너무 많아요",
+    "근거가 부정확해요",
+    "보완 방향 팁이 도움이 안 됐어요",
+    "분석 자체가 진행되지 않았어요",
+    "기타",
+]
+
+_ERROR_OPTIONS = [
+    "파일이 업로드되지 않아요",
+    "URL 크롤링이 안 돼요",
+    "이미지 인식이 안 돼요",
+    "페이지가 멈춰요",
+    "기타",
+]
+
 _RESUME_TEMPLATE = """\
 📋 학력
 예) 한국대학교 컴퓨터공학과 졸업 (2024)
@@ -134,6 +152,50 @@ def _char_counter(text: str) -> bool:
         return False
     st.caption(f"{n:,} / {_MAX_CHARS:,}자")
     return True
+
+
+def render_error_report(page: str) -> None:
+    key_open = f"_err_open_{page}"
+    key_done = f"_err_done_{page}"
+
+    if st.session_state.get(key_done):
+        st.caption("✅ 신고가 접수됐어요. 감사해요!")
+        return
+
+    if not st.session_state.get(key_open):
+        if st.button("오류 신고", key=f"_err_btn_{page}"):
+            st.session_state[key_open] = True
+            st.rerun()
+        return
+
+    st.markdown("**어떤 오류가 발생했나요?** (복수 선택 가능)")
+    selected = [opt for i, opt in enumerate(_ERROR_OPTIONS)
+                if st.checkbox(opt, key=f"_err_{page}_{i}")]
+
+    other_text = ""
+    if "기타" in selected:
+        other_text = st.text_area(
+            "기타 내용",
+            placeholder="자유롭게 적어주세요",
+            key=f"_err_other_{page}",
+            height=80,
+        )
+
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("신고 제출", key=f"_err_submit_{page}", type="primary", disabled=not selected):
+            props: dict = {"page": page}
+            props.update({opt: True for opt in selected})
+            if other_text:
+                props["other"] = other_text
+            events.capture("error_report", props)
+            st.session_state[key_open] = False
+            st.session_state[key_done] = True
+            st.rerun()
+    with col2:
+        if st.button("취소", key=f"_err_cancel_{page}"):
+            st.session_state[key_open] = False
+            st.rerun()
 
 
 def render_step1() -> None:
@@ -198,6 +260,8 @@ def render_step1() -> None:
                        {"method": "pdf" if st.session_state.get("_last_pdf_id") else "text"})
         st.session_state.step = 2
         st.rerun()
+
+    render_error_report("resume")
 
 
 def _detect_jd_method() -> str:
@@ -356,6 +420,8 @@ def render_step2() -> None:
     else:
         st.caption(f"오늘 남은 분석 횟수: {_remaining} / {_MAX_DAILY_ANALYSES}")
 
+    render_error_report("jd")
+
 
 def render_step3() -> None:
     if st.session_state.get("_daily_count", 0) >= _MAX_DAILY_ANALYSES:
@@ -478,29 +544,25 @@ def render_step4() -> None:
         col_yes, col_no = st.columns(2)
         with col_yes:
             if st.button("👍 도움됐어요", use_container_width=True):
-                _submit_feedback(helpful=True, reason="", grade=grade)
+                _submit_feedback(helpful=True, grade=grade)
         with col_no:
             if st.button("👎 아쉬웠어요", use_container_width=True):
                 st.session_state["_show_reason"] = True
 
         if st.session_state.get("_show_reason"):
-            reason = st.radio(
-                "어떤 점이 아쉬웠나요?",
-                ["결과가 부정확한 것 같아요", "내용이 너무 추상적이에요",
-                 "이력서를 잘 못 읽은 것 같아요", "기타"],
-                key="_feedback_reason",
-            )
+            st.markdown("**어떤 점이 아쉬웠나요?** (복수 선택 가능)")
+            selected = [opt for i, opt in enumerate(_NEGATIVE_OPTIONS)
+                        if st.checkbox(opt, key=f"_fb_{i}")]
             other_text = ""
-            if reason == "기타":
+            if "기타" in selected:
                 other_text = st.text_area(
-                    "어떤 점이 아쉬웠는지 알려주세요 (선택)",
+                    "기타 내용",
                     placeholder="자유롭게 적어주세요",
                     key="_feedback_other",
-                    height=100,
+                    height=80,
                 )
-            if st.button("제출", type="primary"):
-                final_reason = f"기타: {other_text.strip()}" if reason == "기타" and other_text.strip() else reason
-                _submit_feedback(helpful=False, reason=final_reason, grade=grade)
+            if st.button("제출", type="primary", disabled=not selected):
+                _submit_feedback(helpful=False, grade=grade, reasons=selected, other=other_text)
     else:
         st.success("피드백 감사해요! 🙏")
 
@@ -530,17 +592,24 @@ def render_step4() -> None:
         _reset()
 
 
-def _submit_feedback(helpful: bool, reason: str, grade: str) -> None:
+def _submit_feedback(helpful: bool, grade: str, reasons: list | None = None, other: str = "") -> None:
+    reason_str = ""
+    if reasons:
+        reason_str = ", ".join(reasons)
+        if other:
+            reason_str += f" | 기타: {other}"
     if _FEEDBACK_ENABLED:
         try:
-            _save_feedback(helpful=helpful, reason=reason, grade=grade)
+            _save_feedback(helpful=helpful, reason=reason_str, grade=grade)
         except Exception:
             pass
-    events.capture("feedback_submitted", {
-        "helpful": "yes" if helpful else "no",
-        "reason": reason,
-        "grade": grade,
-    })
+    events.capture("feedback_submitted", {"helpful": "yes" if helpful else "no", "grade": grade})
+    if not helpful and reasons:
+        neg_props: dict = {"grade": grade}
+        neg_props.update({r: True for r in reasons})
+        if other:
+            neg_props["other"] = other
+        events.capture("feedback_negative", neg_props)
     st.session_state.feedback_submitted = True
     st.session_state.pop("_show_reason", None)
     st.rerun()
