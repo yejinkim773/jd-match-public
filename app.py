@@ -209,8 +209,12 @@ def render_error_report(page: str) -> None:
 
 
 def render_step1() -> None:
+    # tab_img_r은 tab_text보다 나중에 렌더링되어 _text_resume를 직접 set 불가.
+    # 이전 렌더에서 예약된 값이 있으면 위젯 렌더 전에 미리 적용.
+    if "_resume_text_pending" in st.session_state:
+        st.session_state["_text_resume"] = st.session_state.pop("_resume_text_pending")
+
     st.subheader("이력서를 입력해주세요")
-    # Change 2: 개인정보 안내 문구
     st.info("🔒 입력하신 내용은 분석 목적으로만 사용되며, 수집 및 저장되지 않습니다.")
     st.caption("💡 이름, 전화번호, 주소 등 민감한 개인정보는 텍스트 탭에서 삭제하거나 수정한 뒤 등록하시는 걸 권장드려요.")
 
@@ -327,7 +331,8 @@ def render_step1() -> None:
                          disabled=not resume_img_within or not resume_img_edit.strip()):
                 st.session_state.resume_text = resume_img_edit
                 # _last_pdf_id는 유지 (pop하면 다음 렌더에서 PDF 재추출 → resume_text 덮어씀)
-                st.session_state["_text_resume"] = resume_img_edit
+                # _text_resume는 tab_text가 이미 렌더링돼 직접 set 불가 → pending으로 다음 렌더에 적용
+                st.session_state["_resume_text_pending"] = resume_img_edit
                 st.session_state.pop("_pdf_preview", None)
                 st.session_state.pop("_pdf_extracted_original", None)
                 # 등록 후 OCR 편집 영역 숨김 (되돌리기가 등록 철회처럼 보이는 문제 방지)
