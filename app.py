@@ -102,7 +102,7 @@ _NEGATIVE_OPTIONS = [
 
 _ERROR_OPTIONS = [
     "파일이 업로드되지 않아요",
-    "URL 크롤링이 안 돼요",
+    "채용공고 URL 크롤링이 안 돼요",
     "이미지 인식이 안 돼요",
     "페이지가 멈춰요",
     "기타",
@@ -172,6 +172,14 @@ def render_error_report(page: str) -> None:
     selected = [opt for i, opt in enumerate(_ERROR_OPTIONS)
                 if st.checkbox(opt, key=f"_err_{page}_{i}")]
 
+    crawl_site = ""
+    if "채용공고 URL 크롤링이 안 돼요" in selected:
+        crawl_site = st.text_input(
+            "어떤 채용 사이트인가요? (선택)",
+            placeholder="예: 원티드, 사람인, 잡코리아, 링크드인 등",
+            key=f"_err_crawl_site_{page}",
+        )
+
     other_text = ""
     if "기타" in selected:
         other_text = st.text_area(
@@ -186,6 +194,8 @@ def render_error_report(page: str) -> None:
         if st.button("신고 제출", key=f"_err_submit_{page}", type="primary", disabled=not selected):
             props: dict = {"page": page}
             props.update({opt: True for opt in selected})
+            if crawl_site:
+                props["crawl_site"] = crawl_site
             if other_text:
                 props["other"] = other_text
             events.capture("error_report", props)
