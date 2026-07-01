@@ -212,6 +212,7 @@ def render_step1() -> None:
     st.subheader("이력서를 입력해주세요")
     # Change 2: 개인정보 안내 문구
     st.info("🔒 입력하신 내용은 분석 목적으로만 사용되며, 수집 및 저장되지 않습니다.")
+    st.caption("💡 이름, 전화번호, 주소 등 민감한 개인정보는 텍스트 탭에서 삭제하거나 수정한 뒤 등록하시는 걸 권장드려요.")
 
     tab_img_r, tab_pdf, tab_text = st.tabs(["🖼️ 이미지", "📄 PDF 업로드", "✏️ 직접 입력"])
 
