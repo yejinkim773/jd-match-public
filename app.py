@@ -275,9 +275,9 @@ def render_step1() -> None:
             help="이력서 사진이나 스캔본을 올려주세요",
             accept_multiple_files=True,
         )
-        # 업로드 파일이 바뀌면 OCR 결과 초기화
+        # 업로드 파일이 바뀌면 OCR 결과 초기화 (파일 유실로 인한 "" 변경은 무시)
         r_fp = "|".join(f"{f.name}:{f.size}" for f in uploaded_resume_imgs) if uploaded_resume_imgs else ""
-        if r_fp != st.session_state.get("_resume_img_fp", ""):
+        if r_fp and r_fp != st.session_state.get("_resume_img_fp", ""):
             st.session_state["_resume_img_fp"] = r_fp
             st.session_state.pop("_resume_img_preview_text", None)
             st.session_state.pop("_resume_img_edit", None)
@@ -328,6 +328,10 @@ def render_step1() -> None:
                 st.success("✅ 등록됐어요!")
 
     st.divider()
+    if st.session_state.resume_text:
+        st.caption(f"✅ 이력서 등록됨 ({len(st.session_state.resume_text):,}자)")
+        with st.expander("📄 등록된 이력서 확인 (선택)"):
+            st.text(st.session_state.resume_text)
     st.caption(
         "📌 PDF 이력서는 레이아웃에 따라 텍스트가 일부 뒤섞일 수 있어요. "
         "더 정확한 분석을 원하시면 텍스트를 직접 붙여넣기 해주세요."
@@ -414,9 +418,9 @@ def render_step2() -> None:
             key="_jd_imgs",
             accept_multiple_files=True,
         )
-        # 업로드 파일이 바뀌면 OCR 결과 초기화
+        # 업로드 파일이 바뀌면 OCR 결과 초기화 (파일 유실로 인한 "" 변경은 무시)
         new_imgs_fp = "|".join(f"{f.name}:{f.size}" for f in uploaded_imgs) if uploaded_imgs else ""
-        if new_imgs_fp != st.session_state.get("_jd_imgs_fp", ""):
+        if new_imgs_fp and new_imgs_fp != st.session_state.get("_jd_imgs_fp", ""):
             st.session_state["_jd_imgs_fp"] = new_imgs_fp
             st.session_state.pop("_jd_img_preview_text", None)
             st.session_state.pop("_jd_img_edit", None)
@@ -507,6 +511,9 @@ def render_step2() -> None:
         with st.expander("📄 등록된 공고 확인 (선택)"):
             st.text(st.session_state.jd_text)
 
+    if not st.session_state.resume_text.strip():
+        st.warning("⚠️ 이력서가 아직 등록되지 않았어요. '① 이력서' 탭으로 돌아가 이력서를 등록해주세요.")
+
     st.divider()
     col_prev, col_next = st.columns(2)
     with col_prev:
@@ -515,7 +522,8 @@ def render_step2() -> None:
             st.rerun()
     with col_next:
         _count_ok = st.session_state.get("_daily_count", 0) < _MAX_DAILY_ANALYSES
-        _jd_ok = bool(st.session_state.jd_text.strip()) and len(st.session_state.jd_text) <= _MAX_CHARS and _count_ok
+        _resume_registered = bool(st.session_state.resume_text.strip())
+        _jd_ok = _resume_registered and bool(st.session_state.jd_text.strip()) and len(st.session_state.jd_text) <= _MAX_CHARS and _count_ok
         if st.button("🚀 분석 시작", type="primary", use_container_width=True, disabled=not _jd_ok):
             events.capture("jd_registered", {"method": _detect_jd_method()})
             events.capture("analysis_started")
@@ -532,6 +540,19 @@ def render_step2() -> None:
 
 
 def render_step3() -> None:
+    if not st.session_state.resume_text.strip():
+        st.error("이력서 내용이 없어요. 이력서를 입력하고 등록한 뒤 다시 시도해주세요.")
+        if st.button("← 이력서 입력으로"):
+            st.session_state.step = 1
+            st.rerun()
+        return
+    if not st.session_state.jd_text.strip():
+        st.error("채용공고 내용이 없어요. 채용공고를 입력하고 등록한 뒤 다시 시도해주세요.")
+        if st.button("← 채용공고 입력으로"):
+            st.session_state.step = 2
+            st.rerun()
+        return
+
     if st.session_state.get("_daily_count", 0) >= _MAX_DAILY_ANALYSES:
         st.warning(
             "오늘 사용 가능한 분석 횟수(5회)를 모두 사용하셨어요. "

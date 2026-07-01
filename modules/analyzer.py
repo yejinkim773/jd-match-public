@@ -84,6 +84,7 @@ def extract_texts_from_images(images_bytes: list[bytes]) -> str:
         return extract_text_from_image(images_bytes[0])
     parts: list = [{"text": (
         "아래 이미지들에서 텍스트를 페이지 순서대로 빠짐없이 추출해주세요. "
+        "절대 요약하거나 생략하지 마세요. 각 이미지에 있는 모든 텍스트를 원문 그대로 추출하세요. "
         "페이지 사이는 '---' 한 줄로 구분해주세요. "
         "반드시 한국어(한글)로 출력하고, 한자(중국어)나 일본어로 변환하지 마세요. "
         "원문의 줄바꿈 구조를 최대한 유지해주세요."
