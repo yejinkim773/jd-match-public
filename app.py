@@ -1,5 +1,4 @@
 import io
-import json
 from pathlib import Path
 
 import pdfplumber
@@ -23,6 +22,12 @@ try:
 except ImportError:
     _PASTE_ENABLED = False
 
+try:
+    from streamlit_javascript import st_javascript
+    _JS_ENABLED = True
+except ImportError:
+    _JS_ENABLED = False
+
 
 # ── 초기화 ────────────────────────────────────────────────────
 st.set_page_config(page_title="JD 매칭 분석기", page_icon="🎯")
@@ -39,6 +44,7 @@ _DEFAULTS: dict = {
     "analysis_result": None,
     "feedback_submitted": False,
     "app_loaded_captured": False,
+    "_daily_count": 0,
 }
 for _k, _v in _DEFAULTS.items():
     if _k not in st.session_state:
@@ -75,6 +81,7 @@ def render_step_indicator(current: int) -> None:
 
 
 _MAX_CHARS = 10_000
+_MAX_DAILY_ANALYSES = 5
 
 _GRADE_COLORS = {
     "적합도 높음":      "#10B981",
@@ -181,6 +188,10 @@ def render_step1() -> None:
         _char_counter(st.session_state.get("_text_resume", ""))
 
     st.divider()
+    st.caption(
+        "📌 PDF 이력서는 레이아웃에 따라 텍스트가 일부 뒤섞일 수 있어요. "
+        "더 정확한 분석을 원하시면 텍스트를 직접 붙여넣기 해주세요."
+    )
     _resume_ok = bool(st.session_state.resume_text.strip()) and len(st.session_state.resume_text) <= _MAX_CHARS
     if st.button("다음 →", type="primary", disabled=not _resume_ok):
         events.capture("resume_completed",
@@ -331,15 +342,34 @@ def render_step2() -> None:
             st.session_state.step = 1
             st.rerun()
     with col_next:
-        _jd_ok = bool(st.session_state.jd_text.strip()) and len(st.session_state.jd_text) <= _MAX_CHARS
+        _count_ok = st.session_state.get("_daily_count", 0) < _MAX_DAILY_ANALYSES
+        _jd_ok = bool(st.session_state.jd_text.strip()) and len(st.session_state.jd_text) <= _MAX_CHARS and _count_ok
         if st.button("🚀 분석 시작", type="primary", use_container_width=True, disabled=not _jd_ok):
             events.capture("jd_registered", {"method": _detect_jd_method()})
             events.capture("analysis_started")
             st.session_state.step = 3
             st.rerun()
 
+    _remaining = max(0, _MAX_DAILY_ANALYSES - st.session_state.get("_daily_count", 0))
+    if _remaining == 0:
+        st.warning("오늘 사용 가능한 분석 횟수(5회)를 모두 사용했어요. 내일 다시 이용해 주세요! 😊")
+    else:
+        st.caption(f"오늘 남은 분석 횟수: {_remaining} / {_MAX_DAILY_ANALYSES}")
+
 
 def render_step3() -> None:
+    if st.session_state.get("_daily_count", 0) >= _MAX_DAILY_ANALYSES:
+        st.warning(
+            "오늘 사용 가능한 분석 횟수(5회)를 모두 사용하셨어요. "
+            "내일 다시 이용해 주세요! 매일 자정에 횟수가 초기화돼요. 😊"
+        )
+        if st.button("← 돌아가기"):
+            st.session_state.step = 2
+            st.rerun()
+        return
+
+    _increment_daily_count()
+
     st.subheader("분석 중이에요...")
     st.caption("이력서와 채용공고를 비교하는 중이에요. 10~20초 소요돼요.")
 
@@ -477,63 +507,23 @@ def render_step4() -> None:
     st.divider()
 
     # ── 공유 / 재분석 ──────────────────────────────────────
-    copy_text = (
-        f"[JD 매칭 분석기]\n"
-        f"{result.get('company', '')} · {result.get('position', '')}\n"
-        f"적합도: {grade}\n\n"
-        f"{result.get('summary', '')}"
-    )
-    col_copy, col_img, col_share = st.columns(3)
-
-    with col_copy:
-        # JS 클립보드 복사 (다운로드 없이 바로 복사)
-        components.html(f"""
-        <button id="copyBtn" onclick="
-          navigator.clipboard.writeText({json.dumps(copy_text)}).then(() => {{
-            document.getElementById('copyBtn').innerText = '✅ 복사됐어요!';
-            setTimeout(() => document.getElementById('copyBtn').innerText = '📋 텍스트 복사', 2000);
-          }}).catch(() => {{
-            var ta = document.createElement('textarea');
-            ta.value = {json.dumps(copy_text)};
-            document.body.appendChild(ta); ta.select();
-            document.execCommand('copy'); document.body.removeChild(ta);
-            document.getElementById('copyBtn').innerText = '✅ 복사됐어요!';
-            setTimeout(() => document.getElementById('copyBtn').innerText = '📋 텍스트 복사', 2000);
-          }});" style="background:white;color:#1E293B;border:1px solid #D1D5DB;
-          padding:8px 0;border-radius:6px;font-size:14px;cursor:pointer;width:100%;">
-          📋 텍스트 복사</button>
-        """, height=45)
-
-    with col_img:
-        try:
-            img_bytes = generate_result_image(result)
-            st.download_button(
-                "🖼️ 이미지 저장",
-                data=img_bytes,
-                file_name="jd_match_result.png",
-                mime="image/png",
-                use_container_width=True,
-            )
-        except Exception:
-            st.caption("이미지 생성에 실패했어요.")
-
-    with col_share:
-        # Web Share API (모바일 네이티브 공유) → 미지원 시 링크 복사
-        components.html("""
-        <button onclick="
-          if (navigator.share) {
-            navigator.share({title:'JD 매칭 분석기',
-              text:'이력서 × JD 매칭을 AI로 분석해보세요!',
-              url:window.location.href});
-          } else {
-            navigator.clipboard.writeText(window.location.href).then(() => {
-              this.innerText = '✅ 링크 복사됨!';
-              setTimeout(() => this.innerText = '🔗 공유하기', 2000);
-            });
-          }" style="background:#10B981;color:white;border:none;
-          padding:8px 0;border-radius:6px;font-size:14px;cursor:pointer;width:100%;">
-          🔗 공유하기</button>
-        """, height=45)
+    components.html("""
+    <button onclick="
+      var url = window.parent.location.href;
+      navigator.clipboard.writeText(url).then(() => {
+        this.textContent = '✅ 링크가 복사되었어요!';
+        setTimeout(() => this.textContent = '🔗 공유하기', 2500);
+      }).catch(() => {
+        var ta = document.createElement('textarea');
+        ta.value = url;
+        document.body.appendChild(ta); ta.select();
+        document.execCommand('copy'); document.body.removeChild(ta);
+        this.textContent = '✅ 링크가 복사되었어요!';
+        setTimeout(() => this.textContent = '🔗 공유하기', 2500);
+      });" style="background:#10B981;color:white;border:none;
+      padding:8px 0;border-radius:6px;font-size:14px;cursor:pointer;width:100%;">
+      🔗 공유하기</button>
+    """, height=45)
 
     st.divider()
     if st.button("🔄 다시 분석하기", use_container_width=True):
@@ -556,15 +546,52 @@ def _submit_feedback(helpful: bool, reason: str, grade: str) -> None:
     st.rerun()
 
 
+def _sync_daily_count() -> None:
+    """localStorage에서 오늘 분석 횟수를 읽어 세션에 반영."""
+    if not _JS_ENABLED:
+        return
+    result = st_javascript("""
+    (() => {
+        try {
+            const today = new Date().toISOString().split('T')[0];
+            const raw = localStorage.getItem('jd_daily_count');
+            if (!raw) return 0;
+            const data = JSON.parse(raw);
+            return data.date === today ? (data.count || 0) : 0;
+        } catch(e) { return 0; }
+    })()
+    """)
+    if isinstance(result, (int, float)):
+        js_val = int(result)
+        if js_val > st.session_state.get("_daily_count", 0):
+            st.session_state["_daily_count"] = js_val
+
+
+def _increment_daily_count() -> None:
+    """분석 횟수를 1 증가시키고 localStorage에 저장."""
+    new_count = st.session_state.get("_daily_count", 0) + 1
+    st.session_state["_daily_count"] = new_count
+    if _JS_ENABLED:
+        st_javascript(f"""
+        (() => {{
+            try {{
+                const today = new Date().toISOString().split('T')[0];
+                localStorage.setItem('jd_daily_count', JSON.stringify({{date: today, count: {new_count}}}));
+            }} catch(e) {{}}
+        }})()
+        """)
+
+
 def _reset() -> None:
     for k in list(st.session_state.keys()):
-        if k not in ("session_id", "app_loaded_captured"):
+        if k not in ("session_id", "app_loaded_captured", "_daily_count"):
             del st.session_state[k]
     st.session_state.step = 1
     st.rerun()
 
 
 # ── 라우팅 ────────────────────────────────────────────────────
+_sync_daily_count()
 # Change 4: min(..., 3) 제거 → step=4일 때 ③도 ✅로 표시
 render_step_indicator(st.session_state.step)
 
