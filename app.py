@@ -323,8 +323,10 @@ def render_step1() -> None:
             if st.button("이력서 등록", key="_register_resume_img",
                          disabled=not resume_img_within or not resume_img_edit.strip()):
                 st.session_state.resume_text = resume_img_edit
-                st.session_state.pop("_last_pdf_id", None)
+                # _last_pdf_id는 유지 (pop하면 다음 렌더에서 PDF 재추출 → resume_text 덮어씀)
                 st.session_state.pop("_text_resume", None)
+                st.session_state.pop("_pdf_preview", None)
+                st.session_state.pop("_pdf_extracted_original", None)
                 st.success("✅ 등록됐어요!")
 
     st.divider()
