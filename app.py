@@ -213,7 +213,7 @@ def render_step1() -> None:
     # Change 2: 개인정보 안내 문구
     st.info("🔒 입력하신 정보는 분석에만 사용되며, 서버에 저장되지 않습니다.")
 
-    tab_pdf, tab_text, tab_img_r = st.tabs(["📄 PDF 업로드", "✏️ 직접 입력", "🖼️ 이미지"])
+    tab_img_r, tab_pdf, tab_text = st.tabs(["🖼️ 이미지", "📄 PDF 업로드", "✏️ 직접 입력"])
 
     with tab_pdf:
         uploaded = st.file_uploader(
@@ -230,8 +230,8 @@ def render_step1() -> None:
                     ).strip()
                 if extracted:
                     st.session_state.resume_text = extracted
+                    st.session_state["_pdf_extracted_original"] = extracted
                     st.session_state["_last_pdf_id"] = file_id
-                    # Change 5: 텍스트 탭 위젯 초기화 → 다음 렌더링 시 추출된 텍스트로 재초기화
                     st.session_state.pop("_text_resume", None)
                     st.success("✅ 텍스트 추출 완료! 아래에서 내용을 확인하고 수정할 수 있어요.")
                 else:
@@ -244,7 +244,15 @@ def render_step1() -> None:
                     key="_pdf_preview",
                     on_change=_save_pdf_preview,
                 )
-                st.caption("수정하면 자동으로 반영돼요.")
+                _cap_c, _rst_c = st.columns([4, 1])
+                with _cap_c:
+                    st.caption("수정하면 자동으로 반영돼요.")
+                with _rst_c:
+                    if st.button("↩ 되돌리기", key="_restore_pdf", use_container_width=True,
+                                 disabled=not st.session_state.get("_pdf_extracted_original")):
+                        st.session_state.resume_text = st.session_state["_pdf_extracted_original"]
+                        st.session_state.pop("_pdf_preview", None)
+                        st.rerun()
                 _char_counter(st.session_state.get("_pdf_preview", st.session_state.resume_text))
 
     with tab_text:
@@ -288,7 +296,13 @@ def render_step1() -> None:
                         st.warning("이미지 읽기 중 오류가 발생했어요. PDF 업로드나 직접 입력을 이용해주세요.")
 
         if st.session_state.get("_resume_img_preview_text"):
-            st.caption("추출된 내용을 확인하고 수정한 뒤 '이력서 등록'을 눌러주세요.")
+            _cap_c, _rst_c = st.columns([4, 1])
+            with _cap_c:
+                st.caption("추출된 내용을 확인하고 수정한 뒤 '이력서 등록'을 눌러주세요.")
+            with _rst_c:
+                if st.button("↩ 되돌리기", key="_restore_resume_img", use_container_width=True):
+                    st.session_state.pop("_resume_img_edit", None)
+                    st.rerun()
             st.text_area(
                 "추출된 이력서 내용 (수정 가능)",
                 value=st.session_state["_resume_img_preview_text"],
@@ -359,10 +373,16 @@ def render_step2() -> None:
             )
 
         if st.session_state.get("_jd_url_preview_text"):
-            st.caption(
-                "불러온 내용을 확인하고 수정한 뒤 'JD 등록'을 눌러주세요. "
-                "광고·네비게이션 등 불필요한 내용을 삭제하면 분석 정확도가 높아져요."
-            )
+            _cap_c, _rst_c = st.columns([4, 1])
+            with _cap_c:
+                st.caption(
+                    "불러온 내용을 확인하고 수정한 뒤 'JD 등록'을 눌러주세요. "
+                    "광고·네비게이션 등 불필요한 내용을 삭제하면 분석 정확도가 높아져요."
+                )
+            with _rst_c:
+                if st.button("↩ 되돌리기", key="_restore_jd_url", use_container_width=True):
+                    st.session_state.pop("_jd_url_edit", None)
+                    st.rerun()
             st.text_area(
                 "불러온 공고 내용 (수정 가능)",
                 value=st.session_state["_jd_url_preview_text"],
@@ -443,7 +463,13 @@ def render_step2() -> None:
                         st.rerun()
 
         if st.session_state.get("_jd_img_preview_text"):
-            st.caption("추출된 내용을 확인하고 수정한 뒤 'JD 등록'을 눌러주세요.")
+            _cap_c, _rst_c = st.columns([4, 1])
+            with _cap_c:
+                st.caption("추출된 내용을 확인하고 수정한 뒤 'JD 등록'을 눌러주세요.")
+            with _rst_c:
+                if st.button("↩ 되돌리기", key="_restore_jd_img", use_container_width=True):
+                    st.session_state.pop("_jd_img_edit", None)
+                    st.rerun()
             st.text_area(
                 "추출된 공고 내용 (수정 가능)",
                 value=st.session_state["_jd_img_preview_text"],
