@@ -638,7 +638,7 @@ def render_step4() -> None:
         st.write(f"{icon} **{req.get('requirement', '')}**")
         if req.get("evidence"):
             st.caption(f"└ {req.get('evidence')}")
-        if status in ("partial", "unmatched") and req.get("tip"):
+        if req.get("tip"):
             st.info(f"💡 {req.get('tip')}")
 
     if trait_reqs:
@@ -668,7 +668,30 @@ def render_step4() -> None:
 
     # ── 총평 ──────────────────────────────────────────────
     st.subheader("📝 총평")
-    st.info(result.get("summary", ""))
+    summary = result.get("summary", {})
+    if isinstance(summary, dict):
+        strengths = summary.get("strengths") or []
+        gaps = summary.get("gaps") or []
+        comment = summary.get("comment", "")
+        col_s, col_g = st.columns(2)
+        with col_s:
+            st.markdown("**✅ 어필 포인트**")
+            if strengths:
+                for s in strengths:
+                    st.markdown(f"• {s}")
+            else:
+                st.caption("해당 없음")
+        with col_g:
+            st.markdown("**🔧 보완 포인트**")
+            if gaps:
+                for g in gaps:
+                    st.markdown(f"• {g}")
+            else:
+                st.caption("해당 없음")
+        if comment:
+            st.info(comment)
+    else:
+        st.info(summary)
 
     st.divider()
 
