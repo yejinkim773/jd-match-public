@@ -862,6 +862,7 @@ _sync_daily_count()
 render_step_indicator(st.session_state.step)
 
 step = st.session_state.step
+print(f"[DEBUG] routing: step={step}, keys={list(st.session_state.keys())[:10]}")
 if step == 1:
     render_step1()
 elif step == 2:
