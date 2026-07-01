@@ -212,12 +212,6 @@ def render_error_report(page: str) -> None:
 
 
 def render_step1() -> None:
-    print(f"[DEBUG] render_step1 called, _step1_entered={st.session_state.get('_step1_entered')}")
-    if not st.session_state.get("_step1_entered"):
-        print("[DEBUG] Firing resume_upload_started")
-        events.capture("resume_upload_started")
-        st.session_state["_step1_entered"] = True
-        print(f"[DEBUG] After capture, _step1_entered={st.session_state.get('_step1_entered')}")
 
     # tab_img_r은 tab_text보다 나중에 렌더링되어 _text_resume를 직접 set 불가.
     # 이전 렌더에서 예약된 값이 있으면 위젯 렌더 전에 미리 적용.
@@ -367,10 +361,6 @@ def _detect_jd_method() -> str:
 
 
 def render_step2() -> None:
-    if not st.session_state.get("_step2_entered"):
-        events.capture("jd_input_started")
-        st.session_state["_step2_entered"] = True
-
     st.subheader("채용공고를 입력해주세요")
 
     if st.session_state.get("_jd_tab_override") == "text":
@@ -617,10 +607,6 @@ def render_step3() -> None:
 
 
 def render_step4() -> None:
-    if not st.session_state.get("_step4_entered"):
-        events.capture("result_viewed")
-        st.session_state["_step4_entered"] = True
-
     result = st.session_state.analysis_result
     if not result:
         st.error("분석 결과가 없어요.")
@@ -857,12 +843,23 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# ── 진입 이벤트 (JS 컴포넌트보다 먼저 실행) ─────────────────────
+_current_step = st.session_state.step
+if _current_step == 1 and not st.session_state.get("_step1_entered"):
+    events.capture("resume_upload_started")
+    st.session_state["_step1_entered"] = True
+elif _current_step == 2 and not st.session_state.get("_step2_entered"):
+    events.capture("jd_input_started")
+    st.session_state["_step2_entered"] = True
+elif _current_step == 4 and not st.session_state.get("_step4_entered"):
+    events.capture("result_viewed")
+    st.session_state["_step4_entered"] = True
+
 # ── 라우팅 ────────────────────────────────────────────────────
 _sync_daily_count()
 render_step_indicator(st.session_state.step)
 
 step = st.session_state.step
-print(f"[DEBUG] routing: step={step}, keys={list(st.session_state.keys())[:10]}")
 if step == 1:
     render_step1()
 elif step == 2:
