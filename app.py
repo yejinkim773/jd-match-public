@@ -211,7 +211,7 @@ def render_error_report(page: str) -> None:
 def render_step1() -> None:
     st.subheader("이력서를 입력해주세요")
     # Change 2: 개인정보 안내 문구
-    st.info("🔒 입력하신 정보는 분석에만 사용되며, 서버에 저장되지 않습니다.")
+    st.info("🔒 입력하신 내용은 분석 목적으로만 사용되며, 수집 및 저장되지 않습니다.")
 
     tab_img_r, tab_pdf, tab_text = st.tabs(["🖼️ 이미지", "📄 PDF 업로드", "✏️ 직접 입력"])
 
@@ -268,32 +268,46 @@ def render_step1() -> None:
         _char_counter(st.session_state.get("_text_resume", ""))
 
     with tab_img_r:
-        uploaded_resume_img = st.file_uploader(
-            "이력서 이미지 업로드",
+        uploaded_resume_imgs = st.file_uploader(
+            "이력서 이미지 업로드 (여러 장 가능)",
             type=["png", "jpg", "jpeg", "webp"],
-            key="_resume_img",
+            key="_resume_imgs",
             help="이력서 사진이나 스캔본을 올려주세요",
+            accept_multiple_files=True,
         )
-        # 새 이미지 업로드 시 OCR 결과 초기화
-        r_fp = f"{uploaded_resume_img.name}:{uploaded_resume_img.size}" if uploaded_resume_img else ""
+        # 업로드 파일이 바뀌면 OCR 결과 초기화
+        r_fp = "|".join(f"{f.name}:{f.size}" for f in uploaded_resume_imgs) if uploaded_resume_imgs else ""
         if r_fp != st.session_state.get("_resume_img_fp", ""):
             st.session_state["_resume_img_fp"] = r_fp
             st.session_state.pop("_resume_img_preview_text", None)
             st.session_state.pop("_resume_img_edit", None)
 
-        if uploaded_resume_img:
-            st.image(uploaded_resume_img.getvalue(), use_container_width=True)
-            if st.button("이미지에서 텍스트 추출", key="_extract_resume_img"):
+        if uploaded_resume_imgs:
+            if len(uploaded_resume_imgs) == 1:
+                st.image(uploaded_resume_imgs[0].getvalue(), use_container_width=True)
+            else:
+                img_cols = st.columns(min(len(uploaded_resume_imgs), 3))
+                for i, f in enumerate(uploaded_resume_imgs):
+                    with img_cols[i % 3]:
+                        st.image(f.getvalue(), caption=f"{i + 1}번", use_container_width=True)
+
+            btn_label = f"이미지 {len(uploaded_resume_imgs)}장에서 텍스트 추출" if len(uploaded_resume_imgs) > 1 else "이미지에서 텍스트 추출"
+            if st.button(btn_label, key="_extract_resume_img"):
                 with st.spinner("이미지를 읽는 중..."):
-                    try:
-                        text = extract_text_from_image(uploaded_resume_img.getvalue())
-                        if text.strip():
-                            st.session_state["_resume_img_preview_text"] = text
-                            st.session_state.pop("_resume_img_edit", None)
-                        else:
-                            st.warning("이미지에서 텍스트를 읽지 못했어요. PDF 업로드나 직접 입력을 이용해주세요.")
-                    except Exception:
-                        st.warning("이미지 읽기 중 오류가 발생했어요. PDF 업로드나 직접 입력을 이용해주세요.")
+                    texts = []
+                    for f in uploaded_resume_imgs:
+                        try:
+                            t = extract_text_from_image(f.getvalue())
+                            if t.strip():
+                                texts.append(t)
+                        except Exception:
+                            pass
+                    combined = "\n\n".join(texts) if texts else ""
+                    if combined:
+                        st.session_state["_resume_img_preview_text"] = combined
+                        st.session_state.pop("_resume_img_edit", None)
+                    else:
+                        st.warning("이미지에서 텍스트를 읽지 못했어요. PDF 업로드나 직접 입력을 이용해주세요.")
 
         if st.session_state.get("_resume_img_preview_text"):
             _cap_c, _rst_c = st.columns([4, 1])
