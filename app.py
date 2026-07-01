@@ -233,7 +233,7 @@ def render_step1() -> None:
                     st.session_state.resume_text = extracted
                     st.session_state["_pdf_extracted_original"] = extracted
                     st.session_state["_last_pdf_id"] = file_id
-                    st.session_state.pop("_text_resume", None)
+                    st.session_state["_text_resume"] = extracted
                     st.success("✅ 텍스트 추출 완료! 아래에서 내용을 확인하고 수정할 수 있어요.")
                 else:
                     st.warning("⚠️ 이 PDF에서 텍스트를 읽지 못했어요. '직접 입력' 탭을 이용해주세요.")
@@ -251,8 +251,10 @@ def render_step1() -> None:
                 with _rst_c:
                     if st.button("↩ 되돌리기", key="_restore_pdf", use_container_width=True,
                                  disabled=not st.session_state.get("_pdf_extracted_original")):
-                        st.session_state.resume_text = st.session_state["_pdf_extracted_original"]
-                        st.session_state.pop("_pdf_preview", None)
+                        _orig = st.session_state["_pdf_extracted_original"]
+                        st.session_state.resume_text = _orig
+                        st.session_state["_pdf_preview"] = _orig
+                        st.session_state["_text_resume"] = _orig
                         st.rerun()
                 _char_counter(st.session_state.get("_pdf_preview", st.session_state.resume_text))
 
@@ -325,7 +327,7 @@ def render_step1() -> None:
                          disabled=not resume_img_within or not resume_img_edit.strip()):
                 st.session_state.resume_text = resume_img_edit
                 # _last_pdf_id는 유지 (pop하면 다음 렌더에서 PDF 재추출 → resume_text 덮어씀)
-                st.session_state.pop("_text_resume", None)
+                st.session_state["_text_resume"] = resume_img_edit
                 st.session_state.pop("_pdf_preview", None)
                 st.session_state.pop("_pdf_extracted_original", None)
                 # 등록 후 OCR 편집 영역 숨김 (되돌리기가 등록 철회처럼 보이는 문제 방지)
