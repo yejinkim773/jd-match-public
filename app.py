@@ -6,7 +6,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 import modules.events as events
-from modules.analyzer import analyze_match, extract_text_from_image
+from modules.analyzer import analyze_match, extract_text_from_image, extract_texts_from_images
 from modules.crawler import fetch_jd_from_url
 from modules.result_image import generate_result_image
 
@@ -294,20 +294,15 @@ def render_step1() -> None:
             btn_label = f"이미지 {len(uploaded_resume_imgs)}장에서 텍스트 추출" if len(uploaded_resume_imgs) > 1 else "이미지에서 텍스트 추출"
             if st.button(btn_label, key="_extract_resume_img"):
                 with st.spinner("이미지를 읽는 중..."):
-                    texts = []
-                    for f in uploaded_resume_imgs:
-                        try:
-                            t = extract_text_from_image(f.getvalue())
-                            if t.strip():
-                                texts.append(t)
-                        except Exception:
-                            pass
-                    combined = "\n\n".join(texts) if texts else ""
-                    if combined:
-                        st.session_state["_resume_img_preview_text"] = combined
-                        st.session_state.pop("_resume_img_edit", None)
-                    else:
-                        st.warning("이미지에서 텍스트를 읽지 못했어요. PDF 업로드나 직접 입력을 이용해주세요.")
+                    try:
+                        combined = extract_texts_from_images([f.getvalue() for f in uploaded_resume_imgs])
+                        if combined.strip():
+                            st.session_state["_resume_img_preview_text"] = combined
+                            st.session_state.pop("_resume_img_edit", None)
+                        else:
+                            st.warning("이미지에서 텍스트를 읽지 못했어요. PDF 업로드나 직접 입력을 이용해주세요.")
+                    except Exception:
+                        st.warning("이미지 읽기 중 오류가 발생했어요. PDF 업로드나 직접 입력을 이용해주세요.")
 
         if st.session_state.get("_resume_img_preview_text"):
             _cap_c, _rst_c = st.columns([4, 1])
@@ -458,16 +453,11 @@ def render_step2() -> None:
             btn_label = f"이미지 {len(active_imgs_bytes)}장에서 텍스트 추출" if len(active_imgs_bytes) > 1 else "이미지에서 텍스트 추출"
             if st.button(btn_label, key="_extract_imgs"):
                 with st.spinner("이미지를 읽는 중..."):
-                    texts = []
-                    for b in active_imgs_bytes:
-                        try:
-                            t = extract_text_from_image(b)
-                            if t.strip():
-                                texts.append(t)
-                        except Exception:
-                            pass
-                    combined = "\n\n".join(texts) if texts else ""
-                    if combined:
+                    try:
+                        combined = extract_texts_from_images(active_imgs_bytes)
+                    except Exception:
+                        combined = ""
+                    if combined.strip():
                         st.session_state["_jd_img_preview_text"] = combined
                         st.session_state.pop("_jd_img_edit", None)
                         st.session_state.pop("_jd_tab_override", None)

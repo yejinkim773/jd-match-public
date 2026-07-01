@@ -59,19 +59,38 @@ def test_connection() -> str:
     return f"Status: {resp.status_code}\n\n{resp.text[:800]}"
 
 
-def extract_text_from_image(image_bytes: bytes) -> str:
+def _img_part(image_bytes: bytes) -> dict:
     img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
     buf = io.BytesIO()
     img.save(buf, format="JPEG")
     b64 = base64.b64encode(buf.getvalue()).decode()
+    return {"inline_data": {"mime_type": "image/jpeg", "data": b64}}
+
+
+def extract_text_from_image(image_bytes: bytes) -> str:
     return _call([
         {"text": (
-            "이 이미지에서 채용공고 텍스트를 추출해주세요. "
+            "이 이미지에서 텍스트를 빠짐없이 추출해주세요. "
             "반드시 한국어(한글)로 출력하고, 한자(중국어)나 일본어로 변환하지 마세요. "
             "원문의 줄바꿈 구조를 최대한 유지해주세요."
         )},
-        {"inline_data": {"mime_type": "image/jpeg", "data": b64}},
+        _img_part(image_bytes),
     ])
+
+
+def extract_texts_from_images(images_bytes: list[bytes]) -> str:
+    """여러 이미지를 단일 API 호출로 처리해 누락 없이 텍스트 추출."""
+    if len(images_bytes) == 1:
+        return extract_text_from_image(images_bytes[0])
+    parts: list = [{"text": (
+        "아래 이미지들에서 텍스트를 페이지 순서대로 빠짐없이 추출해주세요. "
+        "페이지 사이는 '---' 한 줄로 구분해주세요. "
+        "반드시 한국어(한글)로 출력하고, 한자(중국어)나 일본어로 변환하지 마세요. "
+        "원문의 줄바꿈 구조를 최대한 유지해주세요."
+    )}]
+    for b in images_bytes:
+        parts.append(_img_part(b))
+    return _call(parts, timeout=90)
 
 
 def _compute_grade(required_matches: list[dict]) -> str:
