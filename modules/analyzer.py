@@ -2,6 +2,7 @@ import base64
 import io
 import json
 import re
+from datetime import date
 from pathlib import Path
 
 import requests
@@ -12,8 +13,12 @@ _PROMPT_FILE = Path(__file__).parent.parent / "prompt.md"
 
 
 def _load_prompt(resume: str, jd: str) -> str:
+    today = date.today().strftime("%Y년 %m월 %d일")
     template = _PROMPT_FILE.read_text(encoding="utf-8")
-    return template.replace("{resume}", resume).replace("{jd}", jd)
+    return (
+        f"오늘 날짜: {today}\n\n"
+        + template.replace("{resume}", resume).replace("{jd}", jd)
+    )
 
 _BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
 _MODEL = "gemini-2.5-flash"
