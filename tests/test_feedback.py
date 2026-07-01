@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 from datetime import datetime
 
 
@@ -8,10 +8,10 @@ def test_save_feedback_appends_row():
          patch("modules.sheets_api.datetime") as mock_dt:
         mock_dt.now.return_value = datetime(2026, 6, 17, 12, 0, 0)
         from modules.sheets_api import save_feedback
-        save_feedback(helpful=True, reason="", score=82)
+        save_feedback(helpful=True, reason="", grade="적합도 높음")
 
     mock_ws.append_row.assert_called_once_with(
-        ["2026-06-17T12:00:00", "yes", "", 82]
+        ["2026-06-17T12:00:00", "yes", "", "적합도 높음"]
     )
 
 
@@ -21,8 +21,8 @@ def test_save_feedback_no_when_not_helpful():
          patch("modules.sheets_api.datetime") as mock_dt:
         mock_dt.now.return_value = datetime(2026, 6, 17, 12, 0, 0)
         from modules.sheets_api import save_feedback
-        save_feedback(helpful=False, reason="결과가 부정확한 것 같아요", score=45)
+        save_feedback(helpful=False, reason="결과가 부정확한 것 같아요", grade="보완 후 지원 권장")
 
     mock_ws.append_row.assert_called_once_with(
-        ["2026-06-17T12:00:00", "no", "결과가 부정확한 것 같아요", 45]
+        ["2026-06-17T12:00:00", "no", "결과가 부정확한 것 같아요", "보완 후 지원 권장"]
     )

@@ -8,7 +8,7 @@ _SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive.file",
 ]
-_FEEDBACK_HEADERS = ["타임스탬프", "도움여부", "이유", "스코어"]
+_FEEDBACK_HEADERS = ["타임스탬프", "도움여부", "이유", "적합도"]
 
 
 def _feedback_sheet() -> gspread.Worksheet:
@@ -25,11 +25,11 @@ def _feedback_sheet() -> gspread.Worksheet:
     return ws
 
 
-def save_feedback(helpful: bool, reason: str, score: int | None) -> None:
+def save_feedback(helpful: bool, reason: str, grade: str) -> None:
     ws = _feedback_sheet()
     ws.append_row([
         datetime.now().isoformat(),
         "yes" if helpful else "no",
         reason,
-        score,
+        grade,
     ])

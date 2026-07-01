@@ -74,21 +74,27 @@ def extract_text_from_image(image_bytes: bytes) -> str:
     ])
 
 
-def _compute_score(required_matches: list[dict]) -> int | None:
-    if not isinstance(required_matches, list) or not required_matches:
-        return 0
-    # trait_based·out_of_scope는 점수 제외, skill_based만 반영
-    scorable = [
-        r for r in required_matches
-        if isinstance(r, dict)
-        and str(r.get("category", "skill_based")).strip().lower() == "skill_based"
+def _compute_grade(required_matches: list[dict]) -> str:
+    valid = [r for r in required_matches if isinstance(r, dict)]
+    scoreable = [
+        r for r in valid
+        if str(r.get("category", "skill_based")).strip().lower() == "skill_based"
     ]
-    total = len(scorable)
+    total = len(scoreable)
     if total == 0:
-        return None
-    matched = sum(1 for r in scorable if str(r.get("status", "")).strip().lower() == "matched")
-    partial = sum(1 for r in scorable if str(r.get("status", "")).strip().lower() == "partial")
-    return round((matched * 1 + partial * 0.5) / total * 100)
+        return "추가 준비 필요"
+    matched = sum(1 for r in scoreable if r.get("status") == "matched")
+    partial = sum(1 for r in scoreable if r.get("status") == "partial")
+    ratio = (matched + partial * 0.5) / total
+
+    if ratio >= 0.85:
+        return "적합도 높음"
+    elif ratio >= 0.70:
+        return "대체로 적합"
+    elif ratio >= 0.50:
+        return "보완 후 지원 권장"
+    else:
+        return "추가 준비 필요"
 
 
 _MAX_INPUT_CHARS = 10_000
@@ -99,6 +105,6 @@ def analyze_match(resume: str, jd: str) -> dict:
         raise ValueError("too_long")
     prompt = _load_prompt(resume, jd)
     result = _parse_json(_call([{"text": prompt}], timeout=60))
-    result.pop("score", None)
-    result["score"] = _compute_score(result.get("required_matches", []))
+    result.pop("grade", None)
+    result["grade"] = _compute_grade(result.get("required_matches", []))
     return result

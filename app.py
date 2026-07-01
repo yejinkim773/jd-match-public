@@ -76,6 +76,13 @@ def render_step_indicator(current: int) -> None:
 
 _MAX_CHARS = 10_000
 
+_GRADE_COLORS = {
+    "적합도 높음":      "#10B981",
+    "대체로 적합":      "#34D399",
+    "보완 후 지원 권장": "#F59E0B",
+    "추가 준비 필요":   "#F97316",
+}
+
 _RESUME_TEMPLATE = """\
 📋 학력
 예) 한국대학교 컴퓨터공학과 졸업 (2024)
@@ -358,7 +365,7 @@ def render_step3() -> None:
                 st.rerun()
             return
 
-    events.capture("analysis_completed", {"score": result.get("score") or 0})
+    events.capture("analysis_completed", {"grade": result.get("grade", "추가 준비 필요")})
     st.session_state.analysis_result = result
     st.session_state.step = 4
     st.rerun()
@@ -372,23 +379,20 @@ def render_step4() -> None:
             _reset()
         return
 
-    score = result.get("score", 0)
+    grade = result.get("grade", "추가 준비 필요")
 
     # ── 헤더 ──────────────────────────────────────────────
     st.markdown(
         f"**{result.get('company', '미확인')}**  ·  {result.get('position', '미확인')}"
     )
 
-    # ── 스코어 ────────────────────────────────────────────
-    if score is None:
-        st.info("ℹ️ 평가 가능한 기술 요건이 없어 점수를 산출할 수 없어요.")
-    else:
-        color = "🟢" if score >= 70 else ("🟡" if score >= 50 else "🔴")
-        col_score, col_bar = st.columns([1, 3])
-        with col_score:
-            st.metric("매칭 스코어", f"{color} {score}점")
-        with col_bar:
-            st.progress(score / 100)
+    # ── 적합도 레이블 ─────────────────────────────────────
+    _grade_color = _GRADE_COLORS.get(grade, "#6B7280")
+    st.markdown(
+        f'<p style="font-size:22px;font-weight:700;color:{_grade_color};margin:4px 0 12px">'
+        f"{grade}</p>",
+        unsafe_allow_html=True,
+    )
 
     # ── 필수요건 ──────────────────────────────────────────
     st.subheader("📋 필수요건")
@@ -444,7 +448,7 @@ def render_step4() -> None:
         col_yes, col_no = st.columns(2)
         with col_yes:
             if st.button("👍 도움됐어요", use_container_width=True):
-                _submit_feedback(helpful=True, reason="", score=score)
+                _submit_feedback(helpful=True, reason="", grade=grade)
         with col_no:
             if st.button("👎 아쉬웠어요", use_container_width=True):
                 st.session_state["_show_reason"] = True
@@ -466,7 +470,7 @@ def render_step4() -> None:
                 )
             if st.button("제출", type="primary"):
                 final_reason = f"기타: {other_text.strip()}" if reason == "기타" and other_text.strip() else reason
-                _submit_feedback(helpful=False, reason=final_reason, score=score)
+                _submit_feedback(helpful=False, reason=final_reason, grade=grade)
     else:
         st.success("피드백 감사해요! 🙏")
 
@@ -476,7 +480,7 @@ def render_step4() -> None:
     copy_text = (
         f"[JD 매칭 분석기]\n"
         f"{result.get('company', '')} · {result.get('position', '')}\n"
-        f"매칭 스코어: {f'{score}점' if score is not None else '평가 불가'}\n\n"
+        f"적합도: {grade}\n\n"
         f"{result.get('summary', '')}"
     )
     col_copy, col_img, col_share = st.columns(3)
@@ -536,16 +540,16 @@ def render_step4() -> None:
         _reset()
 
 
-def _submit_feedback(helpful: bool, reason: str, score: int | None) -> None:
+def _submit_feedback(helpful: bool, reason: str, grade: str) -> None:
     if _FEEDBACK_ENABLED:
         try:
-            _save_feedback(helpful=helpful, reason=reason, score=score)
+            _save_feedback(helpful=helpful, reason=reason, grade=grade)
         except Exception:
             pass
     events.capture("feedback_submitted", {
         "helpful": "yes" if helpful else "no",
         "reason": reason,
-        "score": score,
+        "grade": grade,
     })
     st.session_state.feedback_submitted = True
     st.session_state.pop("_show_reason", None)
