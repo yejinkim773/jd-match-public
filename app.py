@@ -601,7 +601,16 @@ def render_step3() -> None:
                 st.rerun()
             return
 
-    events.capture("analysis_completed", {"grade": result.get("grade", "추가 준비 필요")})
+    required = result.get("required_matches", [])
+    skill_items = [r for r in required if isinstance(r, dict) and r.get("category") == "skill_based"]
+    events.capture("analysis_completed", {
+        "grade": result.get("grade", "추가 준비 필요"),
+        "matched_count": sum(1 for r in skill_items if r.get("status") == "matched"),
+        "partial_count": sum(1 for r in skill_items if r.get("status") == "partial"),
+        "unmatched_count": sum(1 for r in skill_items if r.get("status") == "unmatched"),
+        "resume_chars": len(st.session_state.get("resume_text", "")),
+        "jd_chars": len(st.session_state.get("jd_text", "")),
+    })
     st.session_state.analysis_result = result
     st.session_state.step = 4
     st.rerun()
@@ -853,7 +862,8 @@ elif _current_step == 2 and not st.session_state.get("_step2_entered"):
     events.capture("jd_input_started")
     st.session_state["_step2_entered"] = True
 elif _current_step == 4 and not st.session_state.get("_step4_entered"):
-    events.capture("result_viewed")
+    _grade = (st.session_state.analysis_result or {}).get("grade", "")
+    events.capture("result_viewed", {"grade": _grade} if _grade else None)
     st.session_state["_step4_entered"] = True
 
 # ── 라우팅 ────────────────────────────────────────────────────
