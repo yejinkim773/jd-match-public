@@ -212,9 +212,12 @@ def render_error_report(page: str) -> None:
 
 
 def render_step1() -> None:
+    print(f"[DEBUG] render_step1 called, _step1_entered={st.session_state.get('_step1_entered')}")
     if not st.session_state.get("_step1_entered"):
+        print("[DEBUG] Firing resume_upload_started")
         events.capture("resume_upload_started")
         st.session_state["_step1_entered"] = True
+        print(f"[DEBUG] After capture, _step1_entered={st.session_state.get('_step1_entered')}")
 
     # tab_img_r은 tab_text보다 나중에 렌더링되어 _text_resume를 직접 set 불가.
     # 이전 렌더에서 예약된 값이 있으면 위젯 렌더 전에 미리 적용.
