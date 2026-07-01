@@ -132,6 +132,7 @@ _RESUME_TEMPLATE = """\
 # Change 5: on_change로 text_area 편집 시 즉시 resume_text에 반영
 def _save_pdf_preview() -> None:
     st.session_state.resume_text = st.session_state.get("_pdf_preview", "")
+    st.session_state["_resume_method"] = "pdf"
 
 
 def _save_text_resume() -> None:
@@ -140,6 +141,8 @@ def _save_text_resume() -> None:
     if text.strip() == _RESUME_TEMPLATE.strip():
         text = ""
     st.session_state.resume_text = text
+    if text:
+        st.session_state["_resume_method"] = "text"
 
 
 def _char_counter(text: str) -> bool:
@@ -209,6 +212,10 @@ def render_error_report(page: str) -> None:
 
 
 def render_step1() -> None:
+    if not st.session_state.get("_step1_entered"):
+        events.capture("resume_upload_started")
+        st.session_state["_step1_entered"] = True
+
     # tab_img_r은 tab_text보다 나중에 렌더링되어 _text_resume를 직접 set 불가.
     # 이전 렌더에서 예약된 값이 있으면 위젯 렌더 전에 미리 적용.
     if "_resume_text_pending" in st.session_state:
@@ -319,6 +326,7 @@ def render_step1() -> None:
             if st.button("이력서 등록", key="_register_resume_img",
                          disabled=not resume_img_within or not resume_img_edit.strip()):
                 st.session_state.resume_text = resume_img_edit
+                st.session_state["_resume_method"] = "image"
                 # _last_pdf_id는 유지 (pop하면 다음 렌더에서 PDF 재추출 → resume_text 덮어씀)
                 # _text_resume는 tab_text가 이미 렌더링돼 직접 set 불가 → pending으로 다음 렌더에 적용
                 st.session_state["_resume_text_pending"] = resume_img_edit
@@ -339,8 +347,8 @@ def render_step1() -> None:
     )
     _resume_ok = bool(st.session_state.resume_text.strip()) and len(st.session_state.resume_text) <= _MAX_CHARS
     if st.button("다음 →", type="primary", disabled=not _resume_ok):
-        events.capture("resume_completed",
-                       {"method": "pdf" if st.session_state.get("_last_pdf_id") else "text"})
+        events.capture("resume_uploaded",
+                       {"input_method": st.session_state.get("_resume_method", "text")})
         st.session_state.step = 2
         st.rerun()
 
@@ -356,6 +364,10 @@ def _detect_jd_method() -> str:
 
 
 def render_step2() -> None:
+    if not st.session_state.get("_step2_entered"):
+        events.capture("jd_input_started")
+        st.session_state["_step2_entered"] = True
+
     st.subheader("채용공고를 입력해주세요")
 
     if st.session_state.get("_jd_tab_override") == "text":
@@ -602,6 +614,10 @@ def render_step3() -> None:
 
 
 def render_step4() -> None:
+    if not st.session_state.get("_step4_entered"):
+        events.capture("result_viewed")
+        st.session_state["_step4_entered"] = True
+
     result = st.session_state.analysis_result
     if not result:
         st.error("분석 결과가 없어요.")
