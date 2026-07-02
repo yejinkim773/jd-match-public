@@ -33,8 +33,6 @@ except ImportError:
 st.set_page_config(page_title="FitCheck", page_icon="✓")
 
 _posthog_key = st.secrets.get("POSTHOG_KEY", "")
-if _posthog_key:
-    events.init(_posthog_key)
 
 _DEFAULTS: dict = {
     "step": 1,
@@ -45,12 +43,63 @@ _DEFAULTS: dict = {
     "feedback_submitted": False,
     "app_loaded_captured": False,
     "_daily_count": 0,
+    "_uid": "",
+    "_is_internal": False,
+    "_utm_source": "",
 }
 for _k, _v in _DEFAULTS.items():
     if _k not in st.session_state:
         st.session_state[_k] = _v
 
-if not st.session_state.app_loaded_captured:
+# ── localStorage 읽기 (JS) ──────────────────────────────────
+if _JS_ENABLED:
+    _uid_raw = st_javascript("""
+    (function() {
+        try {
+            let uid = localStorage.getItem('fitcheck_uid');
+            if (!uid) {
+                uid = crypto.randomUUID();
+                localStorage.setItem('fitcheck_uid', uid);
+            }
+            return uid;
+        } catch(e) { return crypto.randomUUID(); }
+    })()
+    """)
+
+    _i_flag = st.query_params.get("_i", "")
+    if _i_flag not in ("0", "1"):
+        _i_flag = ""
+    _internal_raw = st_javascript(f"""
+    (function() {{
+        const flag = "{_i_flag}";
+        if (flag === '1') localStorage.setItem('fitcheck_internal', 'true');
+        else if (flag === '0') localStorage.removeItem('fitcheck_internal');
+        return localStorage.getItem('fitcheck_internal') === 'true';
+    }})()
+    """)
+
+    import re as _re
+    _utm_from_url = _re.sub(r'[^a-z0-9\-]', '', st.query_params.get("utm_source", "").lower())[:20]
+    _utm_raw = st_javascript(f"""
+    (function() {{
+        const source = "{_utm_from_url}";
+        if (source && !localStorage.getItem('fitcheck_utm_source')) {{
+            localStorage.setItem('fitcheck_utm_source', source);
+        }}
+        return localStorage.getItem('fitcheck_utm_source') || '';
+    }})()
+    """)
+
+    if isinstance(_uid_raw, str) and _uid_raw:
+        st.session_state._uid = _uid_raw
+        st.session_state._is_internal = _internal_raw is True
+        st.session_state._utm_source = _utm_raw if isinstance(_utm_raw, str) else ""
+
+# ── PostHog 초기화 ────────────────────────────────────────────
+if _posthog_key and st.session_state._uid:
+    events.init(_posthog_key)
+
+if not st.session_state.app_loaded_captured and events._client is not None:
     events.capture("app_loaded")
     st.session_state.app_loaded_captured = True
 
