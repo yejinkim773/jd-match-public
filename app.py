@@ -51,73 +51,28 @@ for _k, _v in _DEFAULTS.items():
     if _k not in st.session_state:
         st.session_state[_k] = _v
 
-# ── localStorage 읽기 (JS) ──────────────────────────────────
-if _JS_ENABLED:
-    _uid_raw = st_javascript("""
-    (function() {
-        try {
-            const s = window.top.localStorage;
-            let uid = s.getItem('fitcheck_uid');
-            if (!uid) { uid = crypto.randomUUID(); s.setItem('fitcheck_uid', uid); }
-            return uid;
-        } catch(e) {
-            try {
-                let uid = localStorage.getItem('fitcheck_uid');
-                if (!uid) { uid = crypto.randomUUID(); localStorage.setItem('fitcheck_uid', uid); }
-                return uid;
-            } catch(e2) { return crypto.randomUUID(); }
-        }
-    })()
-    """)
+# ── 세션 추적 설정 ───────────────────────────────────────────
+import uuid as _uuid
+import re as _re
 
-    _i_flag = st.query_params.get("_i", "")
-    if _i_flag not in ("0", "1"):
-        _i_flag = ""
-    _internal_raw = st_javascript(f"""
-    (function() {{
-        try {{
-            const s = window.top.localStorage;
-            const flag = "{_i_flag}";
-            if (flag === '1') s.setItem('fitcheck_internal', 'true');
-            else if (flag === '0') s.removeItem('fitcheck_internal');
-            return s.getItem('fitcheck_internal') === 'true';
-        }} catch(e) {{
-            const flag = "{_i_flag}";
-            if (flag === '1') localStorage.setItem('fitcheck_internal', 'true');
-            else if (flag === '0') localStorage.removeItem('fitcheck_internal');
-            return localStorage.getItem('fitcheck_internal') === 'true';
-        }}
-    }})()
-    """)
+if not st.session_state._uid:
+    st.session_state._uid = str(_uuid.uuid4())
 
-    import re as _re
-    _utm_from_url = _re.sub(r'[^a-z0-9\-]', '', st.query_params.get("utm_source", "").lower())[:20]
-    _utm_raw = st_javascript(f"""
-    (function() {{
-        try {{
-            const s = window.top.localStorage;
-            const source = "{_utm_from_url}";
-            if (source && !s.getItem('fitcheck_utm_source')) s.setItem('fitcheck_utm_source', source);
-            return s.getItem('fitcheck_utm_source') || '';
-        }} catch(e) {{
-            const source = "{_utm_from_url}";
-            if (source && !localStorage.getItem('fitcheck_utm_source')) localStorage.setItem('fitcheck_utm_source', source);
-            return localStorage.getItem('fitcheck_utm_source') || '';
-        }}
-    }})()
-    """)
+_i_flag = st.query_params.get("_i", "")
+if _i_flag == "1":
+    st.session_state._is_internal = True
+elif _i_flag == "0":
+    st.session_state._is_internal = False
 
-    if isinstance(_uid_raw, str) and _uid_raw:
-        if not st.session_state._uid:
-            st.session_state._uid = _uid_raw
-        st.session_state._is_internal = _internal_raw is True
-        st.session_state._utm_source = _utm_raw if isinstance(_utm_raw, str) else ""
+_utm_raw = _re.sub(r'[^a-z0-9\-]', '', st.query_params.get("utm_source", "").lower())[:20]
+if _utm_raw and not st.session_state._utm_source:
+    st.session_state._utm_source = _utm_raw
 
 # ── PostHog 초기화 ────────────────────────────────────────────
-if _posthog_key and st.session_state._uid:
+if _posthog_key:
     events.init(_posthog_key)
 
-if not st.session_state.app_loaded_captured and events._client is not None:
+if not st.session_state.app_loaded_captured:
     events.capture("app_loaded")
     st.session_state.app_loaded_captured = True
 
