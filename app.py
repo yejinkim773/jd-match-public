@@ -56,13 +56,17 @@ if _JS_ENABLED:
     _uid_raw = st_javascript("""
     (function() {
         try {
-            let uid = localStorage.getItem('fitcheck_uid');
-            if (!uid) {
-                uid = crypto.randomUUID();
-                localStorage.setItem('fitcheck_uid', uid);
-            }
+            const s = window.top.localStorage;
+            let uid = s.getItem('fitcheck_uid');
+            if (!uid) { uid = crypto.randomUUID(); s.setItem('fitcheck_uid', uid); }
             return uid;
-        } catch(e) { return crypto.randomUUID(); }
+        } catch(e) {
+            try {
+                let uid = localStorage.getItem('fitcheck_uid');
+                if (!uid) { uid = crypto.randomUUID(); localStorage.setItem('fitcheck_uid', uid); }
+                return uid;
+            } catch(e2) { return crypto.randomUUID(); }
+        }
     })()
     """)
 
@@ -71,10 +75,18 @@ if _JS_ENABLED:
         _i_flag = ""
     _internal_raw = st_javascript(f"""
     (function() {{
-        const flag = "{_i_flag}";
-        if (flag === '1') localStorage.setItem('fitcheck_internal', 'true');
-        else if (flag === '0') localStorage.removeItem('fitcheck_internal');
-        return localStorage.getItem('fitcheck_internal') === 'true';
+        try {{
+            const s = window.top.localStorage;
+            const flag = "{_i_flag}";
+            if (flag === '1') s.setItem('fitcheck_internal', 'true');
+            else if (flag === '0') s.removeItem('fitcheck_internal');
+            return s.getItem('fitcheck_internal') === 'true';
+        }} catch(e) {{
+            const flag = "{_i_flag}";
+            if (flag === '1') localStorage.setItem('fitcheck_internal', 'true');
+            else if (flag === '0') localStorage.removeItem('fitcheck_internal');
+            return localStorage.getItem('fitcheck_internal') === 'true';
+        }}
     }})()
     """)
 
@@ -82,11 +94,16 @@ if _JS_ENABLED:
     _utm_from_url = _re.sub(r'[^a-z0-9\-]', '', st.query_params.get("utm_source", "").lower())[:20]
     _utm_raw = st_javascript(f"""
     (function() {{
-        const source = "{_utm_from_url}";
-        if (source && !localStorage.getItem('fitcheck_utm_source')) {{
-            localStorage.setItem('fitcheck_utm_source', source);
+        try {{
+            const s = window.top.localStorage;
+            const source = "{_utm_from_url}";
+            if (source && !s.getItem('fitcheck_utm_source')) s.setItem('fitcheck_utm_source', source);
+            return s.getItem('fitcheck_utm_source') || '';
+        }} catch(e) {{
+            const source = "{_utm_from_url}";
+            if (source && !localStorage.getItem('fitcheck_utm_source')) localStorage.setItem('fitcheck_utm_source', source);
+            return localStorage.getItem('fitcheck_utm_source') || '';
         }}
-        return localStorage.getItem('fitcheck_utm_source') || '';
     }})()
     """)
 
