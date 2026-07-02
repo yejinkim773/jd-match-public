@@ -81,7 +81,7 @@ if not st.session_state.app_loaded_captured:
 def render_step_indicator(current: int) -> None:
     # Change 1: 모든 스텝을 클릭 가능한 버튼으로 변경
     # Change 4: current를 min(...,3) 없이 그대로 받아 step=4시 ③도 ✅로 표시
-    labels = ["① 이력서", "② JD 입력", "③ 결과"]
+    labels = ["① 이력서 업로드", "② 채용공고 업로드", "③ 결과 확인✅"]
     targets = [1, 2, 4]
     cols = st.columns(3)
     for i, (col, label, target) in enumerate(zip(cols, labels, targets), start=1):
