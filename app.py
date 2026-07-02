@@ -409,7 +409,7 @@ def render_step2() -> None:
     if st.session_state.get("_jd_tab_override") == "text":
         st.info("📝 이미지에서 텍스트를 읽지 못했어요. 공고 내용을 직접 붙여넣기 해주세요.")
 
-    tab_img, tab_text, tab_url = st.tabs(["🖼️ 이미지", "📝 텍스트", "🔗 URL"])
+    tab_img, tab_text, tab_url = st.tabs(["🖼️ 이미지", "📝 텍스트", "🔗 URL (Beta)"])
 
     # ── URL 탭 ──────────────────────────────────────────────
     with tab_url:
@@ -435,6 +435,11 @@ def render_step2() -> None:
             )
 
         if st.session_state.get("_jd_url_preview_text"):
+            st.warning(
+                "**📋 추출된 내용을 꼭 확인해주세요!**  \n"
+                "일부 사이트에서는 핵심 공고 내용 대신 광고·메뉴 등 불필요한 내용만 불러올 수 있어요.  \n"
+                "내용이 맞지 않으면 **이미지** 또는 **텍스트** 탭으로 다시 입력해주세요."
+            )
             _cap_c, _rst_c = st.columns([4, 1])
             with _cap_c:
                 st.caption(
