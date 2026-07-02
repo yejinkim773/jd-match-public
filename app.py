@@ -136,16 +136,12 @@ _ERROR_OPTIONS = [
     "파일이 업로드되지 않아요",
     "채용공고 URL 크롤링이 안 돼요",
     "이미지 인식이 안 돼요",
-    "페이지가 멈춰요",
-    "기타",
 ]
 
 _ERROR_TYPE_MAP = {
     "파일이 업로드되지 않아요": "file_upload",
     "채용공고 URL 크롤링이 안 돼요": "url_crawl",
     "이미지 인식이 안 돼요": "image_ocr",
-    "페이지가 멈춰요": "page_freeze",
-    "기타": "other",
 }
 
 _RESUME_TEMPLATE = """\
@@ -223,15 +219,6 @@ def render_error_report(page: str) -> None:
             key=f"_err_crawl_site_{page}",
         )
 
-    other_text = ""
-    if "기타" in selected:
-        other_text = st.text_area(
-            "기타 내용",
-            placeholder="자유롭게 적어주세요",
-            key=f"_err_other_{page}",
-            height=80,
-        )
-
     col1, col2 = st.columns(2)
     with col1:
         if st.button("신고 제출", key=f"_err_submit_{page}", type="primary", disabled=not selected):
@@ -241,8 +228,6 @@ def render_error_report(page: str) -> None:
             }
             if crawl_site:
                 props["crawl_site"] = crawl_site
-            if other_text:
-                props["other"] = other_text
             events.capture("error_report", props)
             st.session_state[key_open] = False
             st.session_state[key_done] = True
