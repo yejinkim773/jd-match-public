@@ -122,6 +122,16 @@ _NEGATIVE_OPTIONS = [
     "기타",
 ]
 
+_NEGATIVE_REASON_MAP = {
+    "필수요건 판정이 맞지 않아요": "wrong_requirement_match",
+    "등급/적합도가 납득이 안 돼요": "wrong_grade",
+    "분석 항목이 빠지거나 너무 많아요": "wrong_item_count",
+    "근거가 부정확해요": "inaccurate_reason",
+    "보완 방향 팁이 도움이 안 됐어요": "unhelpful_tip",
+    "분석 자체가 진행되지 않았어요": "analysis_failed",
+    "기타": "other",
+}
+
 _ERROR_OPTIONS = [
     "파일이 업로드되지 않아요",
     "채용공고 URL 크롤링이 안 돼요",
@@ -816,8 +826,10 @@ def _submit_feedback(helpful: bool, grade: str, reasons: list | None = None, oth
             pass
     events.capture("feedback_submitted", {"helpful": "yes" if helpful else "no", "grade": grade})
     if not helpful and reasons:
-        neg_props: dict = {"grade": grade}
-        neg_props.update({r: True for r in reasons})
+        neg_props: dict = {
+            "grade": grade,
+            "reasons": ", ".join(_NEGATIVE_REASON_MAP.get(r, r) for r in reasons),
+        }
         if other:
             neg_props["other"] = other
         events.capture("feedback_negative", neg_props)
