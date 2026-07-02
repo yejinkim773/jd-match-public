@@ -1,4 +1,3 @@
-import uuid
 import streamlit as st
 
 _client = None
@@ -16,17 +15,25 @@ def init(api_key: str) -> None:
     )
 
 
-def _session_id() -> str:
-    if "session_id" not in st.session_state:
-        st.session_state.session_id = str(uuid.uuid4())
-    return st.session_state.session_id
+def _tracking_context() -> tuple[str, bool, str]:
+    return (
+        st.session_state.get("_uid", ""),
+        st.session_state.get("_is_internal", False),
+        st.session_state.get("_utm_source", ""),
+    )
 
 
 def capture(event: str, properties: dict | None = None) -> None:
     if _client is None:
         return
+    uid, is_internal, utm_source = _tracking_context()
+    props = {
+        "is_internal": is_internal,
+        "utm_source": utm_source,
+        **(properties or {}),
+    }
     _client.capture(
-        distinct_id=_session_id(),
+        distinct_id=uid,
         event=event,
-        properties=properties or {},
+        properties=props,
     )
