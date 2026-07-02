@@ -91,7 +91,8 @@ if _JS_ENABLED:
     """)
 
     if isinstance(_uid_raw, str) and _uid_raw:
-        st.session_state._uid = _uid_raw
+        if not st.session_state._uid:
+            st.session_state._uid = _uid_raw
         st.session_state._is_internal = _internal_raw is True
         st.session_state._utm_source = _utm_raw if isinstance(_utm_raw, str) else ""
 
