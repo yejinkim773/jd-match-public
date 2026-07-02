@@ -881,12 +881,16 @@ elif _current_step == 4 and not st.session_state.get("_step4_entered"):
 _sync_daily_count()
 render_step_indicator(st.session_state.step)
 
-step = st.session_state.step
-if step == 1:
-    render_step1()
-elif step == 2:
-    render_step2()
-elif step == 3:
-    render_step3()
-else:
-    render_step4()
+try:
+    step = st.session_state.step
+    if step == 1:
+        render_step1()
+    elif step == 2:
+        render_step2()
+    elif step == 3:
+        render_step3()
+    else:
+        render_step4()
+except Exception:
+    st.error("오류가 발생했어요. 잠시 후 다시 시도하거나 페이지를 새로고침해주세요.")
+    st.caption("문제가 계속되면 오류 신고 버튼을 이용해주세요.")
