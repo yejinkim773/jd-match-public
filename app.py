@@ -788,11 +788,7 @@ def render_step4() -> None:
 
 
 def _submit_feedback(helpful: bool, grade: str, reasons: list | None = None) -> None:
-    reason_str = ""
-    if reasons:
-        reason_str = ", ".join(reasons)
-        if other:
-            reason_str += f" | 기타: {other}"
+    reason_str = ", ".join(reasons) if reasons else ""
     if _FEEDBACK_ENABLED:
         try:
             _save_feedback(helpful=helpful, reason=reason_str, grade=grade)
