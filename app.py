@@ -545,7 +545,7 @@ def render_step2() -> None:
             st.text(st.session_state.jd_text)
 
     if not st.session_state.resume_text.strip():
-        st.warning("⚠️ 이력서가 아직 작성되지 않았어요. 1. 이력서 업로드로 돌아가 등록해주세요.")
+        st.warning("⚠️ 이력서가 아직 작성되지 않았어요. ① 이력서 업로드 탭으로 돌아가 등록해주세요.")
 
     st.divider()
     col_prev, col_next = st.columns(2)
