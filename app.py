@@ -115,21 +115,13 @@ _GRADE_COLORS = {
 _NEGATIVE_OPTIONS = [
     "필수요건 판정이 맞지 않아요",
     "등급/적합도가 납득이 안 돼요",
-    "분석 항목이 빠지거나 너무 많아요",
     "근거가 부정확해요",
-    "보완 방향 팁이 도움이 안 됐어요",
-    "분석 자체가 진행되지 않았어요",
-    "기타",
 ]
 
 _NEGATIVE_REASON_MAP = {
     "필수요건 판정이 맞지 않아요": "wrong_requirement_match",
     "등급/적합도가 납득이 안 돼요": "wrong_grade",
-    "분석 항목이 빠지거나 너무 많아요": "wrong_item_count",
     "근거가 부정확해요": "inaccurate_reason",
-    "보완 방향 팁이 도움이 안 됐어요": "unhelpful_tip",
-    "분석 자체가 진행되지 않았어요": "analysis_failed",
-    "기타": "other",
 }
 
 _ERROR_OPTIONS = [
@@ -757,16 +749,8 @@ def render_step4() -> None:
             st.markdown("**어떤 점이 아쉬웠나요?** (복수 선택 가능)")
             selected = [opt for i, opt in enumerate(_NEGATIVE_OPTIONS)
                         if st.checkbox(opt, key=f"_fb_{i}")]
-            other_text = ""
-            if "기타" in selected:
-                other_text = st.text_area(
-                    "기타 내용",
-                    placeholder="자유롭게 적어주세요",
-                    key="_feedback_other",
-                    height=80,
-                )
             if st.button("제출", type="primary", disabled=not selected):
-                _submit_feedback(helpful=False, grade=grade, reasons=selected, other=other_text)
+                _submit_feedback(helpful=False, grade=grade, reasons=selected)
     else:
         st.success("피드백 감사해요! 🙏")
 
@@ -803,7 +787,7 @@ def render_step4() -> None:
         _reset()
 
 
-def _submit_feedback(helpful: bool, grade: str, reasons: list | None = None, other: str = "") -> None:
+def _submit_feedback(helpful: bool, grade: str, reasons: list | None = None) -> None:
     reason_str = ""
     if reasons:
         reason_str = ", ".join(reasons)
@@ -816,13 +800,10 @@ def _submit_feedback(helpful: bool, grade: str, reasons: list | None = None, oth
             pass
     events.capture("feedback_submitted", {"helpful": "yes" if helpful else "no", "grade": grade})
     if not helpful and reasons:
-        neg_props: dict = {
+        events.capture("feedback_negative", {
             "grade": grade,
             "reasons": ", ".join(_NEGATIVE_REASON_MAP.get(r, r) for r in reasons),
-        }
-        if other:
-            neg_props["other"] = other
-        events.capture("feedback_negative", neg_props)
+        })
     st.session_state.feedback_submitted = True
     st.session_state.pop("_show_reason", None)
     st.rerun()
